@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stempeluhr – Arbeitszeit-Rechner</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --panel2:#1e222b;
+    --border:#2a2f3a;
+    --text:#e8eaed;
+    --muted:#8b91a1;
+    --accent:#4f8cff;
+    --green:#3ecf8e;
+    --red:#ff5d5d;
+    --amber:#f5a623;
+    --night:#6a5acd;
+    --early:#f5a623;
+    --normal:#4f8cff;
+    --weekend:#ff5d8f;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    padding:16px;
+    min-height:100vh;
+  }
+  .wrap{max-width:760px;margin:0 auto;}
+  header{
+    text-align:center;
+    margin-bottom:16px;
+  }
+  header h1{font-size:1.4rem;margin:0 0 4px;}
+  header p{color:var(--muted);font-size:.85rem;margin:0;}
+
+  .legend{
+    display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
+    margin:12px 0 20px;
+    font-size:.75rem;
+  }
+  .legend span{
+    display:flex;align-items:center;gap:5px;
+    background:var(--panel);border:1px solid var(--border);
+    padding:4px 9px;border-radius:20px;color:var(--muted);
+  }
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+
+  .backup-bar{
+    display:flex;gap:8px;justify-content:center;margin-bottom:16px;flex-wrap:wrap;
+  }
+  .backup-bar button{
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    padding:7px 14px;border-radius:10px;cursor:pointer;font-size:.78rem;
+    display:flex;align-items:center;gap:6px;
+  }
+  .backup-bar button:hover{border-color:var(--accent);}
+
+  .tabs{
+    display:flex;gap:8px;justify-content:center;margin-bottom:16px;
+  }
+  .tab-btn{
+    background:var(--panel);border:1px solid var(--border);color:var(--muted);
+    padding:9px 18px;border-radius:10px;cursor:pointer;font-size:.88rem;font-weight:600;
+  }
+  .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .tab-btn:hover:not(.active){border-color:var(--accent);color:var(--text);}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:16px;
+  }
+
+  .weeknav{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    margin-bottom:12px;
+  }
+  .weeknav button{
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:10px;padding:8px 12px;cursor:pointer;font-size:1rem;
+  }
+  .weeknav button:hover{border-color:var(--accent);}
+  .weeknav .weeklabel{font-weight:600;text-align:center;flex:1;font-size:.95rem;}
+  .weeknav input[type=date]{
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:6px;font-size:.8rem;
+  }
+
+  .soll-row{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .soll-row label{font-size:.85rem;color:var(--muted);}
+  .soll-row input[type=number]{
+    width:80px;background:var(--panel2);border:1px solid var(--border);
+    color:var(--text);border-radius:8px;padding:7px;font-size:.95rem;
+  }
+
+  .summary{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+    margin-top:14px;
+  }
+  .summary .box{
+    background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+    padding:10px;text-align:center;
+  }
+  .summary .box .label{font-size:.7rem;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em;}
+  .summary .box .value{font-size:1.15rem;font-weight:700;font-variant-numeric:tabular-nums;}
+  .summary .box.diff-pos .value{color:var(--green);}
+  .summary .box.diff-neg .value{color:var(--red);}
+
+  .day-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:10px;
+  }
+  .day-card.weekend{border-color:#4a2a3a;background:#1c1620;}
+  .day-card .day-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    margin-bottom:10px;
+  }
+  .day-card .day-name{font-weight:700;font-size:1rem;}
+  .day-card .day-name.we{color:var(--weekend);}
+  .day-card .day-date{color:var(--muted);font-size:.8rem;}
+
+  .time-row{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;
+  }
+  .field label{display:block;font-size:.72rem;color:var(--muted);margin-bottom:4px;}
+  .field input[type=time]{
+    width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:8px 6px;font-size:.95rem;font-variant-numeric:tabular-nums;
+  }
+  .field input[type=time]:focus{outline:none;border-color:var(--accent);}
+
+  .pause-row{
+    display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.82rem;
+  }
+  .pause-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);}
+  .pause-row .hint{color:var(--muted);font-size:.72rem;}
+
+  .breakdown{
+    display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;
+  }
+  .chip{
+    font-size:.72rem;padding:3px 8px;border-radius:20px;
+    display:flex;align-items:center;gap:5px;
+    background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+  }
+  .chip .dot{width:7px;height:7px;}
+
+  .day-foot{
+    display:flex;justify-content:space-between;border-top:1px dashed var(--border);
+    padding-top:8px;font-size:.82rem;
+  }
+  .day-foot .k{color:var(--muted);}
+  .day-foot .v{font-weight:700;font-variant-numeric:tabular-nums;}
+
+  .empty-note{color:var(--muted);font-size:.78rem;font-style:italic;}
+
+  .actions{
+    text-align:center;margin-top:14px;
+  }
+  .actions button{
+    background:none;border:1px solid var(--border);color:var(--muted);
+    padding:8px 14px;border-radius:10px;cursor:pointer;font-size:.8rem;
+  }
+  .actions button:hover{color:var(--red);border-color:var(--red);}
+
+  .year-card{margin-bottom:16px;}
+  .year-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .year-title{font-size:1.1rem;font-weight:700;}
+  .year-tag{font-size:.65rem;background:var(--accent);color:#fff;padding:2px 8px;border-radius:20px;font-weight:600;vertical-align:middle;margin-left:4px;}
+
+  .month-details{margin-top:12px;}
+  .month-details summary{cursor:pointer;color:var(--accent);font-size:.82rem;font-weight:600;padding:4px 0;}
+  .month-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:.78rem;}
+  .month-table th, .month-table td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--border);}
+  .month-table th:first-child, .month-table td:first-child{text-align:left;color:var(--muted);}
+  .month-table td.pos{color:var(--green);}
+  .month-table td.neg{color:var(--red);}
+
+  footer{text-align:center;color:var(--muted);font-size:.7rem;margin-top:20px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⏱ Stempeluhr</h1>
+    <p>Arbeitszeit mit Sekundenerfassung &amp; automatischer Zuschlagsberechnung</p>
+  </header>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--normal)"></span>06–22 Uhr · normal (×1)</span>
+    <span><span class="dot" style="background:var(--early)"></span>04–06 Uhr · ×1,5</span>
+    <span><span class="dot" style="background:var(--night)"></span>22–04 Uhr · Nacht ×2</span>
+    <span><span class="dot" style="background:var(--weekend)"></span>Sa/So · Wochenende ×2</span>
+  </div>
+
+  <div class="backup-bar">
+    <button id="exportBtn">⬇ Sicherung exportieren</button>
+    <button id="importBtn">⬆ Sicherung importieren</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none;">
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="week">Woche</button>
+    <button class="tab-btn" data-tab="year">Jahresrückblick</button>
+  </div>
+
+  <div id="viewWeek" class="view">
+    <div class="panel">
+      <div class="weeknav">
+        <button id="prevWeek" title="Vorige Woche">&larr;</button>
+        <div class="weeklabel" id="weekLabel"></div>
+        <button id="nextWeek" title="Nächste Woche">&rarr;</button>
+      </div>
+      <div class="weeknav" style="margin-bottom:0;">
+        <input type="date" id="weekPicker" style="flex:1;">
+        <div class="soll-row" style="flex:none;">
+          <label for="sollInput">Soll-Std./Woche</label>
+          <input type="number" id="sollInput" min="0" step="0.5" value="40">
+        </div>
+      </div>
+
+      <div class="summary">
+        <div class="box"><div class="label">Soll</div><div class="value" id="sumSoll">–</div></div>
+        <div class="box"><div class="label">Ist (gearbeitet)</div><div class="value" id="sumIst">–</div></div>
+        <div class="box" id="sumDiffBox"><div class="label">Differenz</div><div class="value" id="sumDiff">–</div></div>
+      </div>
+      <div class="summary" style="grid-template-columns:1fr;">
+        <div class="box"><div class="label">Bezahlte Stunden (mit Zuschlägen)</div><div class="value" id="sumPaid">–</div></div>
+      </div>
+    </div>
+
+    <div id="days"></div>
+
+    <div class="actions">
+      <button id="resetWeek">Diese Woche zurücksetzen</button>
+    </div>
+  </div>
+
+  <div id="viewYear" class="view" style="display:none;"></div>
+
+  <footer>Alle Daten werden nur lokal in diesem Browser gespeichert. Nutze die Sicherung, um sie zu exportieren oder auf ein anderes Gerät zu übertragen.</footer>
+</div>
+
+<script>
+const WEEKDAY_NAMES = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
+const MONTH_NAMES = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+const DAY_SEC = 86400;
+const WEEK_PREFIX = 'stempeluhr_week_';
+const SETTINGS_KEY = 'stempeluhr_settings';
+
+// ---------- date helpers ----------
+function getMonday(d){
+  const date = new Date(d);
+  const day = (date.getDay() + 6) % 7; // 0=Mon
+  date.setHours(0,0,0,0);
+  date.setDate(date.getDate() - day);
+  return date;
+}
+function addDays(d, n){
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+function isoDate(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const da = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${da}`;
+}
+function deDate(d){
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}.${mm}.${d.getFullYear()}`;
+}
+
+// ---------- time helpers ----------
+function timeToSec(str){
+  if(!str) return null;
+  const parts = str.split(':').map(Number);
+  const h = parts[0]||0, m = parts[1]||0, s = parts[2]||0;
+  return h*3600 + m*60 + s;
+}
+function secToHMS(totalSec, signed){
+  let sign = '';
+  let t = totalSec;
+  if(signed){
+    sign = t < 0 ? '−' : '+';
+    t = Math.abs(t);
+  } else if(t < 0){
+    sign = '−'; t = Math.abs(t);
+  }
+  const h = Math.floor(t/3600);
+  const m = Math.floor((t%3600)/60);
+  const s = Math.floor(t%60);
+  return `${sign}${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function overlap(aStart,aEnd,bStart,bEnd){
+  return Math.max(0, Math.min(aEnd,bEnd) - Math.max(aStart,bStart));
+}
+
+// ---------- pay calculation ----------
+// bands per calendar day D (0 or 1), offset = D*86400
+function bandSegments(D){
+  const off = D*DAY_SEC;
+  return {
+    night: [[off+0, off+14400], [off+79200, off+86400]], // 00-04 and 22-24
+    early: [[off+14400, off+21600]], // 04-06
+    normal:[[off+21600, off+79200]]  // 06-22
+  };
+}
+
+function calcDay(startStr, endStr, pauseTaken, isWeekend){
+  const empty = {gross:0, night:0, early:0, normal:0, brk:0, net:0, paid:0, hasEntry:false, breakEligible:false};
+  const startSec = timeToSec(startStr);
+  let endSec = timeToSec(endStr);
+  if(startSec === null || endSec === null) return empty;
+  if(endSec <= startSec) endSec += DAY_SEC; // crosses midnight
+  const gross = endSec - startSec;
+  if(gross <= 0) return empty;
+
+  let night=0, early=0, normal=0;
+  for(const D of [0,1]){
+    const segs = bandSegments(D);
+    for(const [s,e] of segs.night) night += overlap(startSec,endSec,s,e);
+    for(const [s,e] of segs.early) early += overlap(startSec,endSec,s,e);
+    for(const [s,e] of segs.normal) normal += overlap(startSec,endSec,s,e);
+  }
+
+  const breakEligible = gross > 6*3600;
+  const brk = (breakEligible && pauseTaken) ? 1800 : 0;
+
+  // distribute break proportionally across bands
+  let nightNet = night, earlyNet = early, normalNet = normal;
+  if(brk > 0 && gross > 0){
+    nightNet  = night  - brk * (night/gross);
+    earlyNet  = early  - brk * (early/gross);
+    normalNet = normal - brk * (normal/gross);
+  }
+  const net = gross - brk;
+
+  let paid;
+  if(isWeekend){
+    paid = net * 2;
+  } else {
+    paid = nightNet*2 + earlyNet*1.5 + normalNet*1;
+  }
+
+  return {
+    gross, night: nightNet, early: earlyNet, normal: normalNet,
+    brk, net, paid, hasEntry:true, breakEligible
+  };
+}
+
+// ---------- state / storage ----------
+function weekKey(monday){ return WEEK_PREFIX + isoDate(monday); }
+
+function loadSettings(){
+  try{
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {soll:40};
+  }catch(e){ return {soll:40}; }
+}
+function saveSettings(s){
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+function loadWeek(monday){
+  try{
+    const raw = localStorage.getItem(weekKey(monday));
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return {days:[0,1,2,3,4,5,6].map(()=>({start:'',end:'',pause:false}))};
+}
+function saveWeek(monday, data){
+  localStorage.setItem(weekKey(monday), JSON.stringify(data));
+}
+function effectiveSoll(data){
+  return (data && data.soll !== undefined && data.soll !== null && !isNaN(data.soll)) ? Number(data.soll) : settings.soll;
+}
+
+let settings = loadSettings();
+let currentMonday = getMonday(new Date());
+let weekData = loadWeek(currentMonday);
+
+// ---------- week view render ----------
+const daysEl = document.getElementById('days');
+const weekLabelEl = document.getElementById('weekLabel');
+const weekPickerEl = document.getElementById('weekPicker');
+const sollInputEl = document.getElementById('sollInput');
+
+function render(){
+  const sunday = addDays(currentMonday, 6);
+  weekLabelEl.textContent = `${deDate(currentMonday)} – ${deDate(sunday)}`;
+  weekPickerEl.value = isoDate(currentMonday);
+  const soll = effectiveSoll(weekData);
+  sollInputEl.value = soll;
+
+  daysEl.innerHTML = '';
+  let totalNet = 0, totalPaid = 0;
+
+  weekData.days.forEach((entry, i) => {
+    const date = addDays(currentMonday, i);
+    const isWeekend = i >= 5;
+    const calc = calcDay(entry.start, entry.end, entry.pause, isWeekend);
+    totalNet += calc.net;
+    totalPaid += calc.paid;
+
+    const card = document.createElement('div');
+    card.className = 'day-card' + (isWeekend ? ' weekend' : '');
+
+    const head = document.createElement('div');
+    head.className = 'day-head';
+    head.innerHTML = `<span class="day-name${isWeekend?' we':''}">${WEEKDAY_NAMES[i]}</span><span class="day-date">${deDate(date)}</span>`;
+    card.appendChild(head);
+
+    const timeRow = document.createElement('div');
+    timeRow.className = 'time-row';
+    timeRow.innerHTML = `
+      <div class="field">
+        <label>Start</label>
+        <input type="time" step="1" value="${entry.start||''}" data-idx="${i}" data-field="start">
+      </div>
+      <div class="field">
+        <label>Ende</label>
+        <input type="time" step="1" value="${entry.end||''}" data-idx="${i}" data-field="end">
+      </div>`;
+    card.appendChild(timeRow);
+
+    const pauseRow = document.createElement('div');
+    pauseRow.className = 'pause-row';
+    const disabled = !calc.breakEligible ? 'disabled' : '';
+    pauseRow.innerHTML = `
+      <input type="checkbox" id="pause${i}" data-idx="${i}" data-field="pause" ${entry.pause?'checked':''} ${disabled}>
+      <label for="pause${i}">Pause gemacht (30 Min)</label>
+      <span class="hint">${calc.hasEntry ? (calc.breakEligible ? '' : '(erst ab 6h Pflicht)') : ''}</span>
+    `;
+    card.appendChild(pauseRow);
+
+    if(calc.hasEntry){
+      const breakdown = document.createElement('div');
+      breakdown.className = 'breakdown';
+      if(isWeekend){
+        breakdown.innerHTML = `<span class="chip"><span class="dot" style="background:var(--weekend)"></span>Wochenende ×2: ${secToHMS(calc.net)}</span>`;
+      } else {
+        let chips = '';
+        if(calc.normal > 0.5) chips += `<span class="chip"><span class="dot" style="background:var(--normal)"></span>Normal: ${secToHMS(calc.normal)}</span>`;
+        if(calc.early > 0.5) chips += `<span class="chip"><span class="dot" style="background:var(--early)"></span>×1,5: ${secToHMS(calc.early)}</span>`;
+        if(calc.night > 0.5) chips += `<span class="chip"><span class="dot" style="background:var(--night)"></span>Nacht ×2: ${secToHMS(calc.night)}</span>`;
+        breakdown.innerHTML = chips;
+      }
+      card.appendChild(breakdown);
+
+      const foot = document.createElement('div');
+      foot.className = 'day-foot';
+      foot.innerHTML = `
+        <span><span class="k">Brutto</span> <span class="v">${secToHMS(calc.gross)}</span></span>
+        <span><span class="k">Pause</span> <span class="v">${secToHMS(calc.brk)}</span></span>
+        <span><span class="k">Netto</span> <span class="v">${secToHMS(calc.net)}</span></span>
+        <span><span class="k">Bezahlt</span> <span class="v">${secToHMS(calc.paid)}</span></span>
+      `;
+      card.appendChild(foot);
+    } else {
+      const note = document.createElement('div');
+      note.className = 'empty-note';
+      note.textContent = 'Kein Eintrag';
+      card.appendChild(note);
+    }
+
+    daysEl.appendChild(card);
+  });
+
+  // bind inputs
+  daysEl.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', onFieldChange);
+    inp.addEventListener('change', onFieldChange);
+  });
+
+  // summary
+  const sollSec = soll * 3600;
+  const diffSec = totalNet - sollSec;
+  document.getElementById('sumSoll').textContent = secToHMS(sollSec);
+  document.getElementById('sumIst').textContent = secToHMS(totalNet);
+  document.getElementById('sumPaid').textContent = secToHMS(totalPaid);
+  const diffBox = document.getElementById('sumDiffBox');
+  const diffEl = document.getElementById('sumDiff');
+  diffEl.textContent = secToHMS(diffSec, true);
+  diffBox.classList.remove('diff-pos','diff-neg');
+  diffBox.classList.add(diffSec >= 0 ? 'diff-pos' : 'diff-neg');
+}
+
+function onFieldChange(e){
+  const idx = Number(e.target.dataset.idx);
+  const field = e.target.dataset.field;
+  if(field === 'pause'){
+    weekData.days[idx].pause = e.target.checked;
+  } else {
+    weekData.days[idx][field] = e.target.value;
+  }
+  saveWeek(currentMonday, weekData);
+  render();
+}
+
+// ---------- week nav ----------
+document.getElementById('prevWeek').addEventListener('click', () => {
+  currentMonday = addDays(currentMonday, -7);
+  weekData = loadWeek(currentMonday);
+  render();
+});
+document.getElementById('nextWeek').addEventListener('click', () => {
+  currentMonday = addDays(currentMonday, 7);
+  weekData = loadWeek(currentMonday);
+  render();
+});
+weekPickerEl.addEventListener('change', () => {
+  const picked = new Date(weekPickerEl.value + 'T00:00:00');
+  if(isNaN(picked)) return;
+  currentMonday = getMonday(picked);
+  weekData = loadWeek(currentMonday);
+  render();
+});
+sollInputEl.addEventListener('input', () => {
+  const v = parseFloat(sollInputEl.value);
+  const val = isNaN(v) ? 0 : v;
+  weekData.soll = val;
+  settings.soll = val;
+  saveWeek(currentMonday, weekData);
+  saveSettings(settings);
+  render();
+});
+document.getElementById('resetWeek').addEventListener('click', () => {
+  if(!confirm('Alle Einträge dieser Woche wirklich löschen?')) return;
+  weekData = {days:[0,1,2,3,4,5,6].map(()=>({start:'',end:'',pause:false})), soll: settings.soll};
+  saveWeek(currentMonday, weekData);
+  render();
+});
+
+// ---------- year review ----------
+function getAllWeeksFromStorage(){
+  const weeks = [];
+  for(let i=0;i<localStorage.length;i++){
+    const key = localStorage.key(i);
+    if(!key || !key.startsWith(WEEK_PREFIX)) continue;
+    const dateStr = key.substring(WEEK_PREFIX.length);
+    const monday = new Date(dateStr + 'T00:00:00');
+    if(isNaN(monday)) continue;
+    let data;
+    try{ data = JSON.parse(localStorage.getItem(key)); }catch(e){ continue; }
+    if(!data || !Array.isArray(data.days)) continue;
+    weeks.push({monday, data});
+  }
+  return weeks;
+}
+
+function computeYearStats(years){
+  const stats = {};
+  years.forEach(y => stats[y] = {
+    netSec:0, paidSec:0, sollSec:0,
+    normal:0, early:0, night:0, weekend:0,
+    weekDaysCount:0,
+    months: Array.from({length:12}, () => ({netSec:0, sollSec:0}))
+  });
+  const yearSet = new Set(years);
+  const weeks = getAllWeeksFromStorage();
+
+  weeks.forEach(({monday, data}) => {
+    const soll = effectiveSoll(data);
+    const dailySollSec = (soll || 0) * 3600 / 7;
+    data.days.forEach((entry, i) => {
+      const date = addDays(monday, i);
+      const y = date.getFullYear();
+      if(!yearSet.has(y)) return;
+      const s = stats[y];
+      s.weekDaysCount++;
+      s.sollSec += dailySollSec;
+      s.months[date.getMonth()].sollSec += dailySollSec;
+      const isWeekend = i >= 5;
+      const calc = calcDay(entry.start, entry.end, entry.pause, isWeekend);
+      if(calc.hasEntry){
+        s.netSec += calc.net;
+        s.paidSec += calc.paid;
+        if(isWeekend){ s.weekend += calc.net; }
+        else { s.normal += calc.normal; s.early += calc.early; s.night += calc.night; }
+        s.months[date.getMonth()].netSec += calc.net;
+      }
+    });
+  });
+  return stats;
+}
+
+function renderYearView(){
+  const yearViewEl = document.getElementById('viewYear');
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear, currentYear-1, currentYear-2];
+  const stats = computeYearStats(years);
+
+  yearViewEl.innerHTML = '';
+  years.forEach(y => {
+    const s = stats[y];
+    const card = document.createElement('div');
+    card.className = 'panel year-card';
+
+    if(s.weekDaysCount === 0){
+      card.innerHTML = `
+        <div class="year-head"><span class="year-title">${y}${y===currentYear?'<span class="year-tag">aktuell</span>':''}</span></div>
+        <p class="empty-note">Keine Daten für dieses Jahr erfasst.</p>`;
+      yearViewEl.appendChild(card);
+      return;
+    }
+
+    const diffSec = s.netSec - s.sollSec;
+    let monthRows = '';
+    s.months.forEach((m, idx) => {
+      if(m.sollSec === 0 && m.netSec === 0) return;
+      const md = m.netSec - m.sollSec;
+      monthRows += `<tr><td>${MONTH_NAMES[idx]}</td><td>${secToHMS(m.netSec)}</td><td>${secToHMS(m.sollSec)}</td><td class="${md>=0?'pos':'neg'}">${secToHMS(md,true)}</td></tr>`;
+    });
+
+    card.innerHTML = `
+      <div class="year-head"><span class="year-title">${y}${y===currentYear?'<span class="year-tag">aktuell</span>':''}</span></div>
+      <div class="summary">
+        <div class="box"><div class="label">Soll</div><div class="value">${secToHMS(s.sollSec)}</div></div>
+        <div class="box"><div class="label">Ist</div><div class="value">${secToHMS(s.netSec)}</div></div>
+        <div class="box ${diffSec>=0?'diff-pos':'diff-neg'}"><div class="label">Differenz</div><div class="value">${secToHMS(diffSec,true)}</div></div>
+      </div>
+      <div class="summary" style="grid-template-columns:1fr;">
+        <div class="box"><div class="label">Bezahlte Stunden (mit Zuschlägen)</div><div class="value">${secToHMS(s.paidSec)}</div></div>
+      </div>
+      <div class="breakdown" style="margin-top:12px;">
+        ${s.normal>0.5?`<span class="chip"><span class="dot" style="background:var(--normal)"></span>Normal: ${secToHMS(s.normal)}</span>`:''}
+        ${s.early>0.5?`<span class="chip"><span class="dot" style="background:var(--early)"></span>×1,5: ${secToHMS(s.early)}</span>`:''}
+        ${s.night>0.5?`<span class="chip"><span class="dot" style="background:var(--night)"></span>Nacht ×2: ${secToHMS(s.night)}</span>`:''}
+        ${s.weekend>0.5?`<span class="chip"><span class="dot" style="background:var(--weekend)"></span>Wochenende ×2: ${secToHMS(s.weekend)}</span>`:''}
+      </div>
+      <details class="month-details">
+        <summary>Monatsübersicht</summary>
+        <table class="month-table">
+          <thead><tr><th>Monat</th><th>Ist</th><th>Soll</th><th>Diff.</th></tr></thead>
+          <tbody>${monthRows || '<tr><td colspan="4" class="empty-note">Keine Monatsdaten</td></tr>'}</tbody>
+        </table>
+      </details>
+    `;
+    yearViewEl.appendChild(card);
+  });
+}
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('viewWeek').style.display = tab === 'week' ? '' : 'none';
+    document.getElementById('viewYear').style.display = tab === 'year' ? '' : 'none';
+    if(tab === 'year') renderYearView();
+  });
+});
+
+// ---------- backup (export / import) ----------
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const backup = {version:1, exportedAt: new Date().toISOString(), settings, weeks:{}};
+  for(let i=0;i<localStorage.length;i++){
+    const key = localStorage.key(i);
+    if(key && key.startsWith(WEEK_PREFIX)){
+      try{ backup.weeks[key] = JSON.parse(localStorage.getItem(key)); }catch(e){}
+    }
+  }
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `stempeluhr-sicherung-${isoDate(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const importFileEl = document.getElementById('importFile');
+document.getElementById('importBtn').addEventListener('click', () => importFileEl.click());
+importFileEl.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let backup;
+    try{ backup = JSON.parse(reader.result); }
+    catch(err){ alert('Ungültige Sicherungsdatei.'); return; }
+    if(!backup || typeof backup !== 'object' || typeof backup.weeks !== 'object'){
+      alert('Ungültige Sicherungsdatei.');
+      return;
+    }
+    if(!confirm('Bestehende lokale Daten werden durch diese Sicherung ersetzt. Fortfahren?')) return;
+
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(WEEK_PREFIX) || k === SETTINGS_KEY)
+      .forEach(k => localStorage.removeItem(k));
+
+    if(backup.settings) saveSettings(backup.settings);
+    Object.entries(backup.weeks).forEach(([key, value]) => {
+      if(key.startsWith(WEEK_PREFIX)) localStorage.setItem(key, JSON.stringify(value));
+    });
+
+    settings = loadSettings();
+    weekData = loadWeek(currentMonday);
+    render();
+    if(document.getElementById('viewYear').style.display !== 'none') renderYearView();
+    alert('Sicherung erfolgreich importiert.');
+  };
+  reader.readAsText(file);
+});
+
+render();
+</script>
+</body>
+</html>
