@@ -19,10 +19,6 @@
     --accent:#4f8cff;
     --green:#3ecf8e;
     --red:#ff5d5d;
-    --amber:#f5a623;
-    --night:#6a5acd;
-    --early:#f5a623;
-    --normal:#4f8cff;
     --weekend:#ff5d8f;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
@@ -41,18 +37,6 @@
   }
   header h1{font-size:1.4rem;margin:0 0 4px;}
   header p{color:var(--muted);font-size:.85rem;margin:0;}
-
-  .legend{
-    display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
-    margin:12px 0 20px;
-    font-size:.75rem;
-  }
-  .legend span{
-    display:flex;align-items:center;gap:5px;
-    background:var(--panel);border:1px solid var(--border);
-    padding:4px 9px;border-radius:20px;color:var(--muted);
-  }
-  .dot{width:9px;height:9px;border-radius:50%;flex:none;}
 
   .backup-bar{
     display:flex;gap:8px;justify-content:center;margin-bottom:16px;flex-wrap:wrap;
@@ -81,6 +65,22 @@
     padding:16px;
     margin-bottom:16px;
   }
+
+  .today-panel{text-align:center;}
+  .today-label{color:var(--muted);font-size:.85rem;margin-bottom:14px;}
+  .today-btn{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:1.1rem;font-weight:700;
+    padding:16px 34px;border-radius:16px;border:none;cursor:pointer;
+    color:#fff;
+  }
+  .today-btn.start{background:var(--accent);}
+  .today-btn.start:hover{background:#3d7ae8;}
+  .today-btn.stop{background:var(--red);}
+  .today-btn.stop:hover{background:#e64d4d;}
+  .today-btn.secondary{background:var(--panel2);border:1px solid var(--border);color:var(--text);font-size:.85rem;padding:10px 20px;}
+  .today-btn.secondary:hover{border-color:var(--accent);}
+  .today-sub{margin-top:12px;font-size:1.4rem;font-weight:700;font-variant-numeric:tabular-nums;}
 
   .weeknav{
     display:flex;align-items:center;justify-content:space-between;gap:8px;
@@ -151,16 +151,6 @@
   .pause-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);}
   .pause-row .hint{color:var(--muted);font-size:.72rem;}
 
-  .breakdown{
-    display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;
-  }
-  .chip{
-    font-size:.72rem;padding:3px 8px;border-radius:20px;
-    display:flex;align-items:center;gap:5px;
-    background:var(--panel2);border:1px solid var(--border);color:var(--muted);
-  }
-  .chip .dot{width:7px;height:7px;}
-
   .day-foot{
     display:flex;justify-content:space-between;border-top:1px dashed var(--border);
     padding-top:8px;font-size:.82rem;
@@ -199,15 +189,8 @@
 <div class="wrap">
   <header>
     <h1>⏱ Stempeluhr</h1>
-    <p>Arbeitszeit mit Sekundenerfassung &amp; automatischer Zuschlagsberechnung</p>
+    <p>Arbeitszeit mit Sekundenerfassung</p>
   </header>
-
-  <div class="legend">
-    <span><span class="dot" style="background:var(--normal)"></span>06–22 Uhr · normal (×1)</span>
-    <span><span class="dot" style="background:var(--early)"></span>04–06 Uhr · ×1,5</span>
-    <span><span class="dot" style="background:var(--night)"></span>22–04 Uhr · Nacht ×2</span>
-    <span><span class="dot" style="background:var(--weekend)"></span>Sa/So · Wochenende ×2</span>
-  </div>
 
   <div class="backup-bar">
     <button id="exportBtn">⬇ Sicherung exportieren</button>
@@ -221,6 +204,12 @@
   </div>
 
   <div id="viewWeek" class="view">
+    <div class="panel today-panel">
+      <div class="today-label" id="todayLabel"></div>
+      <button class="today-btn" id="todayBtn"></button>
+      <div class="today-sub" id="todaySub"></div>
+    </div>
+
     <div class="panel">
       <div class="weeknav">
         <button id="prevWeek" title="Vorige Woche">&larr;</button>
@@ -239,9 +228,6 @@
         <div class="box"><div class="label">Soll</div><div class="value" id="sumSoll">–</div></div>
         <div class="box"><div class="label">Ist (gearbeitet)</div><div class="value" id="sumIst">–</div></div>
         <div class="box" id="sumDiffBox"><div class="label">Differenz</div><div class="value" id="sumDiff">–</div></div>
-      </div>
-      <div class="summary" style="grid-template-columns:1fr;">
-        <div class="box"><div class="label">Bezahlte Stunden (mit Zuschlägen)</div><div class="value" id="sumPaid">–</div></div>
       </div>
     </div>
 
@@ -288,6 +274,7 @@ function deDate(d){
   const mm = String(d.getMonth()+1).padStart(2,'0');
   return `${dd}.${mm}.${d.getFullYear()}`;
 }
+function weekdayIndex(d){ return (d.getDay() + 6) % 7; } // 0=Mon..6=Sun
 
 // ---------- time helpers ----------
 function timeToSec(str){
@@ -295,6 +282,10 @@ function timeToSec(str){
   const parts = str.split(':').map(Number);
   const h = parts[0]||0, m = parts[1]||0, s = parts[2]||0;
   return h*3600 + m*60 + s;
+}
+function nowTimeStr(){
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
 }
 function secToHMS(totalSec, signed){
   let sign = '';
@@ -310,23 +301,10 @@ function secToHMS(totalSec, signed){
   const s = Math.floor(t%60);
   return `${sign}${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
-function overlap(aStart,aEnd,bStart,bEnd){
-  return Math.max(0, Math.min(aEnd,bEnd) - Math.max(aStart,bStart));
-}
 
-// ---------- pay calculation ----------
-// bands per calendar day D (0 or 1), offset = D*86400
-function bandSegments(D){
-  const off = D*DAY_SEC;
-  return {
-    night: [[off+0, off+14400], [off+79200, off+86400]], // 00-04 and 22-24
-    early: [[off+14400, off+21600]], // 04-06
-    normal:[[off+21600, off+79200]]  // 06-22
-  };
-}
-
-function calcDay(startStr, endStr, pauseTaken, isWeekend){
-  const empty = {gross:0, night:0, early:0, normal:0, brk:0, net:0, paid:0, hasEntry:false, breakEligible:false};
+// ---------- time calculation (gross / break / net) ----------
+function calcDay(startStr, endStr, pauseTaken){
+  const empty = {gross:0, brk:0, net:0, hasEntry:false, breakEligible:false};
   const startSec = timeToSec(startStr);
   let endSec = timeToSec(endStr);
   if(startSec === null || endSec === null) return empty;
@@ -334,37 +312,11 @@ function calcDay(startStr, endStr, pauseTaken, isWeekend){
   const gross = endSec - startSec;
   if(gross <= 0) return empty;
 
-  let night=0, early=0, normal=0;
-  for(const D of [0,1]){
-    const segs = bandSegments(D);
-    for(const [s,e] of segs.night) night += overlap(startSec,endSec,s,e);
-    for(const [s,e] of segs.early) early += overlap(startSec,endSec,s,e);
-    for(const [s,e] of segs.normal) normal += overlap(startSec,endSec,s,e);
-  }
-
   const breakEligible = gross > 6*3600;
   const brk = (breakEligible && pauseTaken) ? 1800 : 0;
-
-  // distribute break proportionally across bands
-  let nightNet = night, earlyNet = early, normalNet = normal;
-  if(brk > 0 && gross > 0){
-    nightNet  = night  - brk * (night/gross);
-    earlyNet  = early  - brk * (early/gross);
-    normalNet = normal - brk * (normal/gross);
-  }
   const net = gross - brk;
 
-  let paid;
-  if(isWeekend){
-    paid = net * 2;
-  } else {
-    paid = nightNet*2 + earlyNet*1.5 + normalNet*1;
-  }
-
-  return {
-    gross, night: nightNet, early: earlyNet, normal: normalNet,
-    brk, net, paid, hasEntry:true, breakEligible
-  };
+  return {gross, brk, net, hasEntry:true, breakEligible};
 }
 
 // ---------- state / storage ----------
@@ -410,14 +362,13 @@ function render(){
   sollInputEl.value = soll;
 
   daysEl.innerHTML = '';
-  let totalNet = 0, totalPaid = 0;
+  let totalNet = 0;
 
   weekData.days.forEach((entry, i) => {
     const date = addDays(currentMonday, i);
     const isWeekend = i >= 5;
-    const calc = calcDay(entry.start, entry.end, entry.pause, isWeekend);
+    const calc = calcDay(entry.start, entry.end, entry.pause);
     totalNet += calc.net;
-    totalPaid += calc.paid;
 
     const card = document.createElement('div');
     card.className = 'day-card' + (isWeekend ? ' weekend' : '');
@@ -451,26 +402,12 @@ function render(){
     card.appendChild(pauseRow);
 
     if(calc.hasEntry){
-      const breakdown = document.createElement('div');
-      breakdown.className = 'breakdown';
-      if(isWeekend){
-        breakdown.innerHTML = `<span class="chip"><span class="dot" style="background:var(--weekend)"></span>Wochenende ×2: ${secToHMS(calc.net)}</span>`;
-      } else {
-        let chips = '';
-        if(calc.normal > 0.5) chips += `<span class="chip"><span class="dot" style="background:var(--normal)"></span>Normal: ${secToHMS(calc.normal)}</span>`;
-        if(calc.early > 0.5) chips += `<span class="chip"><span class="dot" style="background:var(--early)"></span>×1,5: ${secToHMS(calc.early)}</span>`;
-        if(calc.night > 0.5) chips += `<span class="chip"><span class="dot" style="background:var(--night)"></span>Nacht ×2: ${secToHMS(calc.night)}</span>`;
-        breakdown.innerHTML = chips;
-      }
-      card.appendChild(breakdown);
-
       const foot = document.createElement('div');
       foot.className = 'day-foot';
       foot.innerHTML = `
         <span><span class="k">Brutto</span> <span class="v">${secToHMS(calc.gross)}</span></span>
         <span><span class="k">Pause</span> <span class="v">${secToHMS(calc.brk)}</span></span>
         <span><span class="k">Netto</span> <span class="v">${secToHMS(calc.net)}</span></span>
-        <span><span class="k">Bezahlt</span> <span class="v">${secToHMS(calc.paid)}</span></span>
       `;
       card.appendChild(foot);
     } else {
@@ -494,7 +431,6 @@ function render(){
   const diffSec = totalNet - sollSec;
   document.getElementById('sumSoll').textContent = secToHMS(sollSec);
   document.getElementById('sumIst').textContent = secToHMS(totalNet);
-  document.getElementById('sumPaid').textContent = secToHMS(totalPaid);
   const diffBox = document.getElementById('sumDiffBox');
   const diffEl = document.getElementById('sumDiff');
   diffEl.textContent = secToHMS(diffSec, true);
@@ -512,6 +448,7 @@ function onFieldChange(e){
   }
   saveWeek(currentMonday, weekData);
   render();
+  renderToday();
 }
 
 // ---------- week nav ----------
@@ -546,7 +483,102 @@ document.getElementById('resetWeek').addEventListener('click', () => {
   weekData = {days:[0,1,2,3,4,5,6].map(()=>({start:'',end:'',pause:false})), soll: settings.soll};
   saveWeek(currentMonday, weekData);
   render();
+  renderToday();
 });
+
+// ---------- today start/stop button ----------
+const todayBtnEl = document.getElementById('todayBtn');
+const todayLabelEl = document.getElementById('todayLabel');
+const todaySubEl = document.getElementById('todaySub');
+let todayTimer = null;
+
+function getOpenEntry(){
+  const today = new Date();
+  const yesterday = addDays(today, -1);
+  for(const d of [yesterday, today]){
+    const monday = getMonday(d);
+    const idx = weekdayIndex(d);
+    const data = loadWeek(monday);
+    const e = data.days[idx];
+    if(e && e.start && !e.end){
+      return {monday, index:idx, date:d, data};
+    }
+  }
+  return null;
+}
+
+function startDay(){
+  const today = new Date();
+  const monday = getMonday(today);
+  const idx = weekdayIndex(today);
+  const data = loadWeek(monday);
+  data.days[idx].start = nowTimeStr();
+  saveWeek(monday, data);
+  currentMonday = monday;
+  weekData = data;
+  render();
+  renderToday();
+}
+
+function endDay(open){
+  const data = loadWeek(open.monday);
+  data.days[open.index].end = nowTimeStr();
+  saveWeek(open.monday, data);
+  currentMonday = open.monday;
+  weekData = data;
+  render();
+  renderToday();
+}
+
+function renderToday(){
+  if(todayTimer){ clearInterval(todayTimer); todayTimer = null; }
+  const open = getOpenEntry();
+
+  if(open){
+    const today = new Date();
+    const dayLabel = isoDate(open.date) === isoDate(today) ? 'Heute' : 'Gestern';
+    todayLabelEl.textContent = `${dayLabel} gestartet um ${open.data.days[open.index].start} Uhr`;
+    todayBtnEl.textContent = '⏹ Tag beenden';
+    todayBtnEl.className = 'today-btn stop';
+    todayBtnEl.onclick = () => endDay(open);
+
+    const base = new Date(open.date);
+    base.setHours(0,0,0,0);
+    const startMs = base.getTime() + timeToSec(open.data.days[open.index].start) * 1000;
+    const tick = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+      todaySubEl.textContent = secToHMS(elapsed);
+    };
+    tick();
+    todayTimer = setInterval(tick, 1000);
+  } else {
+    const today = new Date();
+    const monday = getMonday(today);
+    const idx = weekdayIndex(today);
+    const data = loadWeek(monday);
+    const e = data.days[idx];
+
+    if(e && e.start && e.end){
+      todayLabelEl.textContent = `Heute erfasst: ${e.start} – ${e.end} Uhr`;
+      todaySubEl.textContent = '';
+      todayBtnEl.textContent = '↻ Neu erfassen';
+      todayBtnEl.className = 'today-btn secondary';
+      todayBtnEl.onclick = () => {
+        if(!confirm('Heutigen Eintrag wirklich zurücksetzen und neu starten?')) return;
+        e.start = ''; e.end = ''; e.pause = false;
+        saveWeek(monday, data);
+        if(isoDate(currentMonday) === isoDate(monday)){ weekData = data; render(); }
+        renderToday();
+      };
+    } else {
+      todayLabelEl.textContent = 'Noch kein Eintrag für heute';
+      todaySubEl.textContent = '';
+      todayBtnEl.textContent = '▶ Tag starten';
+      todayBtnEl.className = 'today-btn start';
+      todayBtnEl.onclick = startDay;
+    }
+  }
+}
 
 // ---------- year review ----------
 function getAllWeeksFromStorage(){
@@ -568,8 +600,7 @@ function getAllWeeksFromStorage(){
 function computeYearStats(years){
   const stats = {};
   years.forEach(y => stats[y] = {
-    netSec:0, paidSec:0, sollSec:0,
-    normal:0, early:0, night:0, weekend:0,
+    netSec:0, sollSec:0,
     weekDaysCount:0,
     months: Array.from({length:12}, () => ({netSec:0, sollSec:0}))
   });
@@ -587,13 +618,9 @@ function computeYearStats(years){
       s.weekDaysCount++;
       s.sollSec += dailySollSec;
       s.months[date.getMonth()].sollSec += dailySollSec;
-      const isWeekend = i >= 5;
-      const calc = calcDay(entry.start, entry.end, entry.pause, isWeekend);
+      const calc = calcDay(entry.start, entry.end, entry.pause);
       if(calc.hasEntry){
         s.netSec += calc.net;
-        s.paidSec += calc.paid;
-        if(isWeekend){ s.weekend += calc.net; }
-        else { s.normal += calc.normal; s.early += calc.early; s.night += calc.night; }
         s.months[date.getMonth()].netSec += calc.net;
       }
     });
@@ -635,15 +662,6 @@ function renderYearView(){
         <div class="box"><div class="label">Soll</div><div class="value">${secToHMS(s.sollSec)}</div></div>
         <div class="box"><div class="label">Ist</div><div class="value">${secToHMS(s.netSec)}</div></div>
         <div class="box ${diffSec>=0?'diff-pos':'diff-neg'}"><div class="label">Differenz</div><div class="value">${secToHMS(diffSec,true)}</div></div>
-      </div>
-      <div class="summary" style="grid-template-columns:1fr;">
-        <div class="box"><div class="label">Bezahlte Stunden (mit Zuschlägen)</div><div class="value">${secToHMS(s.paidSec)}</div></div>
-      </div>
-      <div class="breakdown" style="margin-top:12px;">
-        ${s.normal>0.5?`<span class="chip"><span class="dot" style="background:var(--normal)"></span>Normal: ${secToHMS(s.normal)}</span>`:''}
-        ${s.early>0.5?`<span class="chip"><span class="dot" style="background:var(--early)"></span>×1,5: ${secToHMS(s.early)}</span>`:''}
-        ${s.night>0.5?`<span class="chip"><span class="dot" style="background:var(--night)"></span>Nacht ×2: ${secToHMS(s.night)}</span>`:''}
-        ${s.weekend>0.5?`<span class="chip"><span class="dot" style="background:var(--weekend)"></span>Wochenende ×2: ${secToHMS(s.weekend)}</span>`:''}
       </div>
       <details class="month-details">
         <summary>Monatsübersicht</summary>
@@ -718,6 +736,7 @@ importFileEl.addEventListener('change', (e) => {
     settings = loadSettings();
     weekData = loadWeek(currentMonday);
     render();
+    renderToday();
     if(document.getElementById('viewYear').style.display !== 'none') renderYearView();
     alert('Sicherung erfolgreich importiert.');
   };
@@ -725,6 +744,7 @@ importFileEl.addEventListener('change', (e) => {
 });
 
 render();
+renderToday();
 </script>
 </body>
 </html>

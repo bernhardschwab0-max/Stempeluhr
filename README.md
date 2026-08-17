@@ -1,23 +1,18 @@
 # ⏱ Stempeluhr
 
-Eine kleine, eigenständige Web-App zur Arbeitszeiterfassung mit Sekundengenauigkeit,
-automatischer Zuschlagsberechnung und Wochen-/Jahresübersicht.
+Eine kleine, eigenständige Web-App zur Arbeitszeiterfassung mit Sekundengenauigkeit
+und Wochen-/Jahresübersicht.
 
 Läuft komplett im Browser – **keine Installation, kein Server, kein Backend** nötig.
 Alle Daten werden lokal im `localStorage` des Browsers gespeichert.
 
 ## Funktionen
 
-- **Wochenansicht** (Mo–So) mit Start-/Endzeit auf die Sekunde genau
-- **Automatische Zuschlagsberechnung**:
-  - 06:00–22:00 Uhr → normal (×1)
-  - 04:00–06:00 Uhr → ×1,5
-  - 22:00–04:00 Uhr → Nachtarbeit ×2
-  - Samstag/Sonntag → Wochenende, pauschal ×2
-  - Eine Schicht wird automatisch korrekt über mehrere Zeitfenster aufgeteilt (z. B. eine Nachtschicht von 20–06 Uhr)
-- **Pausenregelung**: Ab 6 Stunden Bruttoarbeitszeit wählbar, ob 30 Minuten Pause gemacht wurden (wird anteilig von den Zuschlagszeiten abgezogen)
+- **Tag starten / Tag beenden**: ein Klick beim Arbeitsbeginn übernimmt die aktuelle Uhrzeit auf die Sekunde genau als Start, ein Klick beim Feierabend als Ende – inklusive Live-Laufzeitanzeige während der Schicht
+- **Wochenansicht** (Mo–So) mit Start-/Endzeit, auch manuell editierbar
+- **Pausenregelung**: Ab 6 Stunden Bruttoarbeitszeit wählbar, ob 30 Minuten Pause gemacht wurden
 - **Soll-/Ist-Vergleich pro Woche**: frei einstellbare wöchentliche Sollstunden, geleistete Stunden werden automatisch abgezogen → Über-/Minusstunden auf einen Blick
-- **Jahresrückblick**: aggregierte Übersicht für das aktuelle Jahr und die zwei Vorjahre, inkl. Monatsaufschlüsselung und Zuschlagskategorien
+- **Jahresrückblick**: aggregierte Soll-/Ist-Übersicht für das aktuelle Jahr und die zwei Vorjahre, inkl. Monatsaufschlüsselung
 - **Sicherung (Backup)**: alle Daten lassen sich als JSON-Datei exportieren und auf einem anderen Gerät/Browser wieder importieren
 
 ## Nutzung
