@@ -420,9 +420,9 @@ function render(){
     daysEl.appendChild(card);
   });
 
-  // bind inputs
+  // bind inputs (only commit on "change" - i.e. after confirming with OK/Enter/blur,
+  // not on every intermediate "input" event while still picking a time)
   daysEl.querySelectorAll('input').forEach(inp => {
-    inp.addEventListener('input', onFieldChange);
     inp.addEventListener('change', onFieldChange);
   });
 
