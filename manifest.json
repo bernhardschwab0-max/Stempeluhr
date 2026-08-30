@@ -1,7 +1,7 @@
 {
   "name": "Stempeluhr",
   "short_name": "Stempeluhr",
-  "description": "Arbeitszeiterfassung mit Sekundenerfassung, Zuschlagsberechnung und Jahresrückblick",
+  "description": "Arbeitszeiterfassung mit Sekundenerfassung, Überstunden-, Urlaubs- und Zeitausgleichsverwaltung",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

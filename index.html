@@ -19,7 +19,9 @@
     --accent:#4f8cff;
     --green:#3ecf8e;
     --red:#ff5d5d;
-    --weekend:#ff5d8f;
+    --sonntag:#ffa94f;
+    --vacation:#3ecf8e;
+    --za:#8b7bf0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   *{box-sizing:border-box;}
@@ -49,11 +51,11 @@
   .backup-bar button:hover{border-color:var(--accent);}
 
   .tabs{
-    display:flex;gap:8px;justify-content:center;margin-bottom:16px;
+    display:flex;gap:6px;justify-content:center;margin-bottom:16px;flex-wrap:wrap;
   }
   .tab-btn{
     background:var(--panel);border:1px solid var(--border);color:var(--muted);
-    padding:9px 18px;border-radius:10px;cursor:pointer;font-size:.88rem;font-weight:600;
+    padding:8px 14px;border-radius:10px;cursor:pointer;font-size:.82rem;font-weight:600;
   }
   .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
   .tab-btn:hover:not(.active){border-color:var(--accent);color:var(--text);}
@@ -80,6 +82,7 @@
   .today-btn.stop:hover{background:#e64d4d;}
   .today-btn.secondary{background:var(--panel2);border:1px solid var(--border);color:var(--text);font-size:.85rem;padding:10px 20px;}
   .today-btn.secondary:hover{border-color:var(--accent);}
+  .today-btn:disabled{opacity:.5;cursor:not-allowed;}
   .today-sub{margin-top:12px;font-size:1.4rem;font-weight:700;font-variant-numeric:tabular-nums;}
 
   .weeknav{
@@ -110,6 +113,7 @@
     display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
     margin-top:14px;
   }
+  .summary.grid2{grid-template-columns:repeat(2,1fr);}
   .summary .box{
     background:var(--panel2);border:1px solid var(--border);border-radius:10px;
     padding:10px;text-align:center;
@@ -126,24 +130,32 @@
     padding:14px;
     margin-bottom:10px;
   }
-  .day-card.weekend{border-color:#4a2a3a;background:#1c1620;}
+  .day-card.sonntag{border-color:#4a3a2a;background:#211a12;}
+  .day-card.absence{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .day-card.absence.urlaub{border-color:#1f4a3a;background:#122019;}
+  .day-card.absence.za{border-color:#3a2f5c;background:#191527;}
   .day-card .day-head{
     display:flex;justify-content:space-between;align-items:baseline;
     margin-bottom:10px;
   }
   .day-card .day-name{font-weight:700;font-size:1rem;}
-  .day-card .day-name.we{color:var(--weekend);}
+  .day-card .day-name.so{color:var(--sonntag);}
   .day-card .day-date{color:var(--muted);font-size:.8rem;}
+
+  .badge{display:inline-block;font-size:.68rem;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;}
+  .badge.sonntag{background:rgba(255,169,79,.15);color:var(--sonntag);}
+  .badge.urlaub{background:rgba(62,207,142,.15);color:var(--vacation);}
+  .badge.za{background:rgba(139,123,240,.15);color:var(--za);}
 
   .time-row{
     display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;
   }
   .field label{display:block;font-size:.72rem;color:var(--muted);margin-bottom:4px;}
-  .field input[type=time]{
+  .field input[type=time], .field input[type=date], .field input[type=text], .field input[type=number], .field select{
     width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
     border-radius:8px;padding:8px 6px;font-size:.95rem;font-variant-numeric:tabular-nums;
   }
-  .field input[type=time]:focus{outline:none;border-color:var(--accent);}
+  .field input:focus, .field select:focus{outline:none;border-color:var(--accent);}
 
   .pause-row{
     display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.82rem;
@@ -200,6 +212,8 @@
 
   <div class="tabs">
     <button class="tab-btn active" data-tab="week">Woche</button>
+    <button class="tab-btn" data-tab="ueberstunden">Überstunden</button>
+    <button class="tab-btn" data-tab="urlaub">Urlaub</button>
     <button class="tab-btn" data-tab="year">Jahresrückblick</button>
   </div>
 
@@ -224,10 +238,15 @@
         </div>
       </div>
 
-      <div class="summary">
-        <div class="box"><div class="label">Soll</div><div class="value" id="sumSoll">–</div></div>
-        <div class="box"><div class="label">Ist (gearbeitet)</div><div class="value" id="sumIst">–</div></div>
+      <div class="summary grid2">
+        <div class="box">
+          <div class="label">Soll (Mo–Sa)</div>
+          <div class="value" id="sumSoll">–</div>
+          <div id="sollHint" style="font-size:.68rem;color:var(--muted);margin-top:2px;"></div>
+        </div>
+        <div class="box"><div class="label">Ist (Mo–Sa)</div><div class="value" id="sumIst">–</div></div>
         <div class="box" id="sumDiffBox"><div class="label">Differenz</div><div class="value" id="sumDiff">–</div></div>
+        <div class="box"><div class="label">Überstunden (So)</div><div class="value" id="sumSonntag">–</div></div>
       </div>
     </div>
 
@@ -238,6 +257,8 @@
     </div>
   </div>
 
+  <div id="viewUeberstunden" class="view" style="display:none;"></div>
+  <div id="viewUrlaub" class="view" style="display:none;"></div>
   <div id="viewYear" class="view" style="display:none;"></div>
 
   <footer>Alle Daten werden nur lokal in diesem Browser gespeichert. Nutze die Sicherung, um sie zu exportieren oder auf ein anderes Gerät zu übertragen.</footer>
@@ -249,6 +270,8 @@ const MONTH_NAMES = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt
 const DAY_SEC = 86400;
 const WEEK_PREFIX = 'stempeluhr_week_';
 const SETTINGS_KEY = 'stempeluhr_settings';
+const ABSENCES_KEY = 'stempeluhr_absences_v1';
+const DEFAULT_SETTINGS = {soll:40, pauschale:10, urlaubTage:30};
 
 // ---------- date helpers ----------
 function getMonday(d){
@@ -289,7 +312,7 @@ function nowTimeStr(){
 }
 function secToHMS(totalSec, signed){
   let sign = '';
-  let t = totalSec;
+  let t = Math.round(totalSec); // Gleitkomma-Rundungsfehler (z.B. 40/6*3600) glätten
   if(signed){
     sign = t < 0 ? '−' : '+';
     t = Math.abs(t);
@@ -300,6 +323,10 @@ function secToHMS(totalSec, signed){
   const m = Math.floor((t%3600)/60);
   const s = Math.floor(t%60);
   return `${sign}${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function tage(n){ return `${n} Tag${n===1?'':'e'}`; }
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // ---------- time calculation (gross / break / net) ----------
@@ -324,8 +351,9 @@ function weekKey(monday){ return WEEK_PREFIX + isoDate(monday); }
 
 function loadSettings(){
   try{
-    return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {soll:40};
-  }catch(e){ return {soll:40}; }
+    const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    return {...DEFAULT_SETTINGS, ...(stored||{})};
+  }catch(e){ return {...DEFAULT_SETTINGS}; }
 }
 function saveSettings(s){
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
@@ -344,9 +372,162 @@ function effectiveSoll(data){
   return (data && data.soll !== undefined && data.soll !== null && !isNaN(data.soll)) ? Number(data.soll) : settings.soll;
 }
 
+function loadAbsences(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(ABSENCES_KEY));
+    if(Array.isArray(raw)) return raw;
+  }catch(e){}
+  return [];
+}
+function saveAbsences(list){
+  localStorage.setItem(ABSENCES_KEY, JSON.stringify(list));
+}
+
 let settings = loadSettings();
+let absences = loadAbsences();
 let currentMonday = getMonday(new Date());
 let weekData = loadWeek(currentMonday);
+let urlaubYear = new Date().getFullYear();
+
+// ---------- absence helpers (Urlaub / Zeitausgleich) ----------
+function rangeDates(fromIso, toIso){
+  const out = [];
+  let d = new Date(fromIso + 'T00:00:00');
+  const end = new Date(toIso + 'T00:00:00');
+  if(isNaN(d) || isNaN(end) || d > end) return out;
+  while(d <= end){
+    out.push(new Date(d));
+    d = addDays(d, 1);
+  }
+  return out;
+}
+function countWorkDaysInRange(fromIso, toIso){
+  return rangeDates(fromIso, toIso).filter(d => weekdayIndex(d) !== 6).length; // Sonntag zählt nicht
+}
+function getAbsenceForDate(dateIso){
+  return absences.find(a => a.from <= dateIso && dateIso <= a.to) || null;
+}
+function absenceDaysUsedInYear(year, type){
+  let total = 0;
+  const yStart = `${year}-01-01`, yEnd = `${year}-12-31`;
+  absences.forEach(a => {
+    if(a.type !== type) return;
+    const from = a.from < yStart ? yStart : a.from;
+    const to = a.to > yEnd ? yEnd : a.to;
+    if(from > to) return;
+    total += countWorkDaysInRange(from, to);
+  });
+  return total;
+}
+
+// ---------- weekly balance (Mo–Sa gegen Soll, Sonntag immer Überstunden) ----------
+function computeWeekBalance(monday, data){
+  const rawSoll = effectiveSoll(data);
+  const dailyTarget = rawSoll / 6;
+  let monSatNet = 0, sonntagNet = 0;
+  let vacDays = 0, zaDays = 0;
+
+  for(let i=0;i<7;i++){
+    const d = addDays(monday, i);
+    const dateIso = isoDate(d);
+    const abs = getAbsenceForDate(dateIso);
+
+    if(i === 6){ // Sonntag
+      if(!abs){
+        const calc = calcDay(data.days[i].start, data.days[i].end, data.days[i].pause);
+        sonntagNet += calc.net;
+      }
+      continue;
+    }
+    if(abs){
+      if(abs.type === 'urlaub') vacDays++; else zaDays++;
+      continue; // Urlaub/ZA-Tag: neutral, kein Ist, kein Soll
+    }
+    const calc = calcDay(data.days[i].start, data.days[i].end, data.days[i].pause);
+    monSatNet += calc.net;
+  }
+
+  const adjustedSollSec = Math.max(0, rawSoll - (vacDays+zaDays)*dailyTarget) * 3600;
+  const diffSec = monSatNet - adjustedSollSec;
+  return { rawSoll, dailyTarget, monSatNet, sonntagNet, vacDays, zaDays, adjustedSollSec, diffSec };
+}
+
+// ---------- Jahres-/Monatsstatistik (für Jahresrückblick & Überstunden) ----------
+function computeStats(years){
+  const yearSet = new Set(years);
+  const stats = {};
+  years.forEach(y => stats[y] = {
+    monSatIst:0, monSatSoll:0, sonntagIst:0,
+    months: Array.from({length:12}, () => ({monSatIst:0, monSatSoll:0, sonntagIst:0}))
+  });
+
+  const weeks = getAllRelevantWeeks();
+  weeks.forEach(({monday, data}) => {
+    const rawSoll = effectiveSoll(data);
+    const dailyTarget = rawSoll / 6;
+
+    for(let i=0;i<7;i++){
+      const d = addDays(monday, i);
+      const y = d.getFullYear();
+      if(!yearSet.has(y)) continue;
+      const s = stats[y];
+      const m = s.months[d.getMonth()];
+      const dateIso = isoDate(d);
+      const abs = getAbsenceForDate(dateIso);
+
+      if(i === 6){
+        if(!abs){
+          const calc = calcDay(data.days[i].start, data.days[i].end, data.days[i].pause);
+          if(calc.hasEntry){ s.sonntagIst += calc.net; m.sonntagIst += calc.net; }
+        }
+        continue;
+      }
+      if(abs) continue;
+
+      s.monSatSoll += dailyTarget*3600; m.monSatSoll += dailyTarget*3600;
+      const calc = calcDay(data.days[i].start, data.days[i].end, data.days[i].pause);
+      if(calc.hasEntry){ s.monSatIst += calc.net; m.monSatIst += calc.net; }
+    }
+  });
+
+  return stats;
+}
+
+// ---------- ZA-Konto: kumulierte Überstunden über der Pauschale, minus genommener ZA-Tage ----------
+function computeZaKonto(){
+  const weeks = getAllRelevantWeeks();
+  const pauschaleSec = (settings.pauschale||0) * 3600;
+  let totalOverPauschale = 0;
+
+  if(weeks.length > 0){
+    let minYear = Infinity, maxYear = -Infinity;
+    weeks.forEach(({monday}) => {
+      minYear = Math.min(minYear, monday.getFullYear());
+      maxYear = Math.max(maxYear, addDays(monday,6).getFullYear());
+    });
+    const allYears = [];
+    for(let y=minYear;y<=maxYear;y++) allYears.push(y);
+    const stats = computeStats(allYears);
+    allYears.forEach(y => {
+      stats[y].months.forEach(m => {
+        const overtime = Math.max(0, m.monSatIst - m.monSatSoll) + m.sonntagIst;
+        totalOverPauschale += Math.max(0, overtime - pauschaleSec);
+      });
+    });
+  }
+
+  let zaTakenSec = 0;
+  absences.filter(a => a.type === 'za').forEach(a => {
+    rangeDates(a.from, a.to).forEach(d => {
+      if(weekdayIndex(d) === 6) return;
+      const monday = getMonday(d);
+      const data = loadWeek(monday);
+      zaTakenSec += (effectiveSoll(data)/6) * 3600;
+    });
+  });
+
+  return totalOverPauschale - zaTakenSec;
+}
 
 // ---------- week view render ----------
 const daysEl = document.getElementById('days');
@@ -361,21 +542,44 @@ function render(){
   const soll = effectiveSoll(weekData);
   sollInputEl.value = soll;
 
+  const wb = computeWeekBalance(currentMonday, weekData);
+
   daysEl.innerHTML = '';
-  let totalNet = 0;
 
   weekData.days.forEach((entry, i) => {
     const date = addDays(currentMonday, i);
-    const isWeekend = i >= 5;
+    const dateIso = isoDate(date);
+    const isSonntag = i === 6;
+    const abs = getAbsenceForDate(dateIso);
     const calc = calcDay(entry.start, entry.end, entry.pause);
-    totalNet += calc.net;
 
     const card = document.createElement('div');
-    card.className = 'day-card' + (isWeekend ? ' weekend' : '');
+
+    if(abs){
+      card.className = 'day-card absence ' + abs.type;
+      const typeLabel = abs.type === 'urlaub' ? '🌴 Urlaub' : '🔁 Zeitausgleich';
+      card.innerHTML = `
+        <div>
+          <div class="day-name">${WEEKDAY_NAMES[i]}</div>
+          <div class="day-date">${deDate(date)}</div>
+        </div>
+        <span class="badge ${abs.type}">${typeLabel}</span>
+      `;
+      daysEl.appendChild(card);
+      return;
+    }
+
+    card.className = 'day-card' + (isSonntag ? ' sonntag' : '');
 
     const head = document.createElement('div');
     head.className = 'day-head';
-    head.innerHTML = `<span class="day-name${isWeekend?' we':''}">${WEEKDAY_NAMES[i]}</span><span class="day-date">${deDate(date)}</span>`;
+    head.innerHTML = `
+      <span class="day-name${isSonntag?' so':''}">${WEEKDAY_NAMES[i]}</span>
+      <span style="display:flex;align-items:center;gap:8px;">
+        ${isSonntag && calc.hasEntry ? '<span class="badge sonntag">Überstunden</span>' : ''}
+        <span class="day-date">${deDate(date)}</span>
+      </span>
+    `;
     card.appendChild(head);
 
     const timeRow = document.createElement('div');
@@ -427,15 +631,24 @@ function render(){
   });
 
   // summary
-  const sollSec = soll * 3600;
-  const diffSec = totalNet - sollSec;
-  document.getElementById('sumSoll').textContent = secToHMS(sollSec);
-  document.getElementById('sumIst').textContent = secToHMS(totalNet);
+  document.getElementById('sumSoll').textContent = secToHMS(wb.adjustedSollSec);
+  document.getElementById('sumIst').textContent = secToHMS(wb.monSatNet);
   const diffBox = document.getElementById('sumDiffBox');
   const diffEl = document.getElementById('sumDiff');
-  diffEl.textContent = secToHMS(diffSec, true);
+  diffEl.textContent = secToHMS(wb.diffSec, true);
   diffBox.classList.remove('diff-pos','diff-neg');
-  diffBox.classList.add(diffSec >= 0 ? 'diff-pos' : 'diff-neg');
+  diffBox.classList.add(wb.diffSec >= 0 ? 'diff-pos' : 'diff-neg');
+  document.getElementById('sumSonntag').textContent = secToHMS(wb.sonntagNet);
+
+  const sollHint = document.getElementById('sollHint');
+  if(wb.vacDays + wb.zaDays > 0){
+    const parts = [];
+    if(wb.vacDays) parts.push(`${wb.vacDays} Urlaub`);
+    if(wb.zaDays) parts.push(`${wb.zaDays} ZA`);
+    sollHint.textContent = `(− ${parts.join(', ')})`;
+  } else {
+    sollHint.textContent = '';
+  }
 }
 
 function onFieldChange(e){
@@ -532,11 +745,26 @@ function endDay(open){
 
 function renderToday(){
   if(todayTimer){ clearInterval(todayTimer); todayTimer = null; }
+  todayBtnEl.disabled = false;
+
+  const todayDate = new Date();
+  const todayIso = isoDate(todayDate);
+  const todayAbs = getAbsenceForDate(todayIso);
   const open = getOpenEntry();
 
+  if(!open && todayAbs){
+    const typeLabel = todayAbs.type === 'urlaub' ? '🌴 Urlaub' : '🔁 Zeitausgleich';
+    todayLabelEl.textContent = `Heute: ${typeLabel} eingetragen`;
+    todaySubEl.textContent = '';
+    todayBtnEl.textContent = 'Kein Arbeitstag';
+    todayBtnEl.className = 'today-btn secondary';
+    todayBtnEl.disabled = true;
+    todayBtnEl.onclick = null;
+    return;
+  }
+
   if(open){
-    const today = new Date();
-    const dayLabel = isoDate(open.date) === isoDate(today) ? 'Heute' : 'Gestern';
+    const dayLabel = isoDate(open.date) === todayIso ? 'Heute' : 'Gestern';
     todayLabelEl.textContent = `${dayLabel} gestartet um ${open.data.days[open.index].start} Uhr`;
     todayBtnEl.textContent = '⏹ Tag beenden';
     todayBtnEl.className = 'today-btn stop';
@@ -552,9 +780,8 @@ function renderToday(){
     tick();
     todayTimer = setInterval(tick, 1000);
   } else {
-    const today = new Date();
-    const monday = getMonday(today);
-    const idx = weekdayIndex(today);
+    const monday = getMonday(todayDate);
+    const idx = weekdayIndex(todayDate);
     const data = loadWeek(monday);
     const e = data.days[idx];
 
@@ -580,7 +807,212 @@ function renderToday(){
   }
 }
 
-// ---------- year review ----------
+// ---------- Urlaub tab ----------
+function renderUrlaubView(){
+  const el = document.getElementById('viewUrlaub');
+  const total = settings.urlaubTage || 0;
+  const used = absenceDaysUsedInYear(urlaubYear, 'urlaub');
+  const rest = total - used;
+  const zaUsed = absenceDaysUsedInYear(urlaubYear, 'za');
+
+  el.innerHTML = `
+    <div class="panel">
+      <div class="weeknav">
+        <button id="uPrevYear">&larr;</button>
+        <div class="weeklabel">${urlaubYear}</div>
+        <button id="uNextYear">&rarr;</button>
+      </div>
+      <div class="soll-row" style="margin-bottom:12px;">
+        <label for="urlaubTageInput">Urlaubstage/Jahr</label>
+        <input type="number" id="urlaubTageInput" min="0" step="1" value="${total}">
+      </div>
+      <div class="summary grid2">
+        <div class="box"><div class="label">Gesamt</div><div class="value">${tage(total)}</div></div>
+        <div class="box"><div class="label">Genommen</div><div class="value">${tage(used)}</div></div>
+        <div class="box ${rest>=0?'diff-pos':'diff-neg'}"><div class="label">Rest</div><div class="value">${tage(rest)}</div></div>
+        <div class="box"><div class="label">Zeitausgleich genommen</div><div class="value">${tage(zaUsed)}</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="day-head" style="margin-bottom:10px;"><span class="day-name">Neuer Eintrag</span></div>
+      <div class="time-row">
+        <div class="field"><label>Von</label><input type="date" id="absFrom"></div>
+        <div class="field"><label>Bis</label><input type="date" id="absTo"></div>
+      </div>
+      <div class="time-row">
+        <div class="field">
+          <label>Art</label>
+          <select id="absType">
+            <option value="urlaub">Urlaub</option>
+            <option value="za">Zeitausgleich</option>
+          </select>
+        </div>
+        <div class="field"><label>Notiz (optional)</label><input type="text" id="absNote" placeholder="z. B. Kurzurlaub"></div>
+      </div>
+      <button id="absAddBtn" class="today-btn start" style="width:100%;font-size:.95rem;padding:12px;">+ Eintragen</button>
+    </div>
+
+    <div id="absList"></div>
+  `;
+
+  const listEl = el.querySelector('#absList');
+  const relevant = absences
+    .filter(a => parseInt(a.from.slice(0,4),10) <= urlaubYear && parseInt(a.to.slice(0,4),10) >= urlaubYear)
+    .sort((a,b) => b.from.localeCompare(a.from));
+
+  if(relevant.length === 0){
+    listEl.innerHTML = '<p class="empty-note" style="text-align:center;">Keine Einträge für dieses Jahr.</p>';
+  } else {
+    relevant.forEach(a => {
+      const clipFrom = a.from < `${urlaubYear}-01-01` ? `${urlaubYear}-01-01` : a.from;
+      const clipTo = a.to > `${urlaubYear}-12-31` ? `${urlaubYear}-12-31` : a.to;
+      const days = countWorkDaysInRange(clipFrom, clipTo);
+      const item = document.createElement('div');
+      item.className = 'day-card absence ' + a.type;
+      const typeLabel = a.type === 'urlaub' ? '🌴 Urlaub' : '🔁 Zeitausgleich';
+      const rangeLabel = a.from === a.to
+        ? deDate(new Date(a.from+'T00:00:00'))
+        : `${deDate(new Date(a.from+'T00:00:00'))} – ${deDate(new Date(a.to+'T00:00:00'))}`;
+      item.innerHTML = `
+        <div>
+          <div class="day-name">${rangeLabel}</div>
+          <div class="day-date">${days} Tag${days===1?'':'e'}${a.note?' · '+escapeHtml(a.note):''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="badge ${a.type}">${typeLabel}</span>
+          <button data-id="${a.id}" class="del-abs-btn" title="Löschen" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;">🗑</button>
+        </div>
+      `;
+      listEl.appendChild(item);
+    });
+  }
+
+  el.querySelector('#uPrevYear').addEventListener('click', () => { urlaubYear--; renderUrlaubView(); });
+  el.querySelector('#uNextYear').addEventListener('click', () => { urlaubYear++; renderUrlaubView(); });
+  el.querySelector('#urlaubTageInput').addEventListener('input', (e) => {
+    const v = parseInt(e.target.value, 10);
+    settings.urlaubTage = isNaN(v) ? 0 : v;
+    saveSettings(settings);
+    renderUrlaubView();
+  });
+  el.querySelector('#absAddBtn').addEventListener('click', addAbsence);
+  listEl.querySelectorAll('.del-abs-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if(!confirm('Diesen Eintrag wirklich löschen?')) return;
+      absences = absences.filter(a => a.id !== btn.dataset.id);
+      saveAbsences(absences);
+      renderUrlaubView();
+    });
+  });
+}
+
+function addAbsence(){
+  const from = document.getElementById('absFrom').value;
+  const to = document.getElementById('absTo').value;
+  const type = document.getElementById('absType').value;
+  const note = document.getElementById('absNote').value.trim();
+  if(!from || !to){ alert('Bitte Von- und Bis-Datum angeben.'); return; }
+  if(from > to){ alert('Das Bis-Datum muss nach dem Von-Datum liegen.'); return; }
+  if(absences.some(a => a.from <= to && from <= a.to)){
+    alert('Für diesen Zeitraum existiert bereits ein Eintrag.');
+    return;
+  }
+  const id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2));
+  absences.push({ id, type, from, to, note });
+  saveAbsences(absences);
+  renderUrlaubView();
+}
+
+// ---------- Überstunden tab ----------
+function renderUeberstundenView(){
+  const el = document.getElementById('viewUeberstunden');
+  const kontoSec = computeZaKonto();
+  const dailyTargetSec = (settings.soll/6) * 3600;
+  const approxDays = dailyTargetSec > 0 ? (kontoSec/dailyTargetSec) : 0;
+
+  let hint;
+  if(dailyTargetSec > 0 && kontoSec >= dailyTargetSec) hint = `Das reicht für ca. ${approxDays.toFixed(1)} Tage Zeitausgleich.`;
+  else if(kontoSec > 0) hint = 'Noch kein voller Tag Zeitausgleich angesammelt.';
+  else hint = 'Aktuell steht kein Zeitausgleich zur Verfügung.';
+
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear, currentYear-1, currentYear-2];
+  const stats = computeStats(years);
+
+  el.innerHTML = `
+    <div class="panel today-panel">
+      <div class="today-label">Dein Zeitausgleich-Konto</div>
+      <div class="today-sub" style="color:${kontoSec>=0?'var(--green)':'var(--red)'};">${secToHMS(kontoSec,true)}</div>
+      <p class="empty-note">${hint}</p>
+    </div>
+    <div class="panel">
+      <div class="soll-row">
+        <label for="pauschaleInput">Überstundenpauschale (Std./Monat)</label>
+        <input type="number" id="pauschaleInput" min="0" step="0.5" value="${settings.pauschale}">
+      </div>
+      <p class="empty-note" style="margin-top:10px;">Überstunden bis zur Pauschale sind mit dem Gehalt bereits abgegolten. Nur was darüber hinausgeht, sammelt sich hier an und kann als Zeitausgleich genommen werden. Sonntagsstunden zählen dabei immer voll als Überstunden.</p>
+    </div>
+  `;
+
+  years.forEach(y => {
+    const s = stats[y];
+    const hasData = s.monSatSoll > 0 || s.sonntagIst > 0;
+    const card = document.createElement('div');
+    card.className = 'panel year-card';
+
+    if(!hasData){
+      card.innerHTML = `<div class="year-head"><span class="year-title">${y}${y===currentYear?'<span class="year-tag">aktuell</span>':''}</span></div><p class="empty-note">Keine Daten für dieses Jahr erfasst.</p>`;
+      el.appendChild(card);
+      return;
+    }
+
+    let rows = '';
+    s.months.forEach((m, idx) => {
+      if(m.monSatSoll===0 && m.sonntagIst===0) return;
+      const diff = m.monSatIst - m.monSatSoll;
+      const overtime = Math.max(0,diff) + m.sonntagIst;
+      const overPauschale = Math.max(0, overtime - settings.pauschale*3600);
+      rows += `<tr><td>${MONTH_NAMES[idx]}</td><td class="${diff>=0?'pos':'neg'}">${secToHMS(diff,true)}</td><td>${m.sonntagIst>0?secToHMS(m.sonntagIst):'–'}</td><td class="${overPauschale>0?'pos':''}">${overPauschale>0?secToHMS(overPauschale):'–'}</td></tr>`;
+    });
+
+    card.innerHTML = `
+      <div class="year-head"><span class="year-title">${y}${y===currentYear?'<span class="year-tag">aktuell</span>':''}</span></div>
+      <details class="month-details" ${y===currentYear?'open':''}>
+        <summary>Monatsübersicht</summary>
+        <table class="month-table">
+          <thead><tr><th>Monat</th><th>Diff. (Mo–Sa)</th><th>Sonntag</th><th>Über Pauschale</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="4" class="empty-note">Keine Monatsdaten</td></tr>'}</tbody>
+        </table>
+      </details>
+    `;
+    el.appendChild(card);
+  });
+
+  el.querySelector('#pauschaleInput').addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    settings.pauschale = isNaN(v) ? 0 : v;
+    saveSettings(settings);
+    renderUeberstundenView();
+  });
+}
+
+// ---------- Jahresrückblick ----------
+// Vereinigt gespeicherte Wochen mit Wochen, die nur einen Urlaub/ZA-Eintrag haben
+// (sonst würde eine reine Urlaubswoche ohne je editierte Zeit in Monats-/Jahresstatistik fehlen)
+function getAllRelevantWeeks(){
+  const map = new Map();
+  getAllWeeksFromStorage().forEach(w => map.set(isoDate(w.monday), w));
+  absences.forEach(a => {
+    rangeDates(a.from, a.to).forEach(d => {
+      const monday = getMonday(d);
+      const key = isoDate(monday);
+      if(!map.has(key)) map.set(key, {monday, data: loadWeek(monday)});
+    });
+  });
+  return Array.from(map.values());
+}
+
 function getAllWeeksFromStorage(){
   const weeks = [];
   for(let i=0;i<localStorage.length;i++){
@@ -597,50 +1029,20 @@ function getAllWeeksFromStorage(){
   return weeks;
 }
 
-function computeYearStats(years){
-  const stats = {};
-  years.forEach(y => stats[y] = {
-    netSec:0, sollSec:0,
-    weekDaysCount:0,
-    months: Array.from({length:12}, () => ({netSec:0, sollSec:0}))
-  });
-  const yearSet = new Set(years);
-  const weeks = getAllWeeksFromStorage();
-
-  weeks.forEach(({monday, data}) => {
-    const soll = effectiveSoll(data);
-    const dailySollSec = (soll || 0) * 3600 / 7;
-    data.days.forEach((entry, i) => {
-      const date = addDays(monday, i);
-      const y = date.getFullYear();
-      if(!yearSet.has(y)) return;
-      const s = stats[y];
-      s.weekDaysCount++;
-      s.sollSec += dailySollSec;
-      s.months[date.getMonth()].sollSec += dailySollSec;
-      const calc = calcDay(entry.start, entry.end, entry.pause);
-      if(calc.hasEntry){
-        s.netSec += calc.net;
-        s.months[date.getMonth()].netSec += calc.net;
-      }
-    });
-  });
-  return stats;
-}
-
 function renderYearView(){
   const yearViewEl = document.getElementById('viewYear');
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear-1, currentYear-2];
-  const stats = computeYearStats(years);
+  const stats = computeStats(years);
 
   yearViewEl.innerHTML = '';
   years.forEach(y => {
     const s = stats[y];
+    const hasData = s.monSatSoll > 0 || s.sonntagIst > 0;
     const card = document.createElement('div');
     card.className = 'panel year-card';
 
-    if(s.weekDaysCount === 0){
+    if(!hasData){
       card.innerHTML = `
         <div class="year-head"><span class="year-title">${y}${y===currentYear?'<span class="year-tag">aktuell</span>':''}</span></div>
         <p class="empty-note">Keine Daten für dieses Jahr erfasst.</p>`;
@@ -648,21 +1050,22 @@ function renderYearView(){
       return;
     }
 
-    const diffSec = s.netSec - s.sollSec;
+    const diffSec = s.monSatIst - s.monSatSoll;
     let monthRows = '';
     s.months.forEach((m, idx) => {
-      if(m.sollSec === 0 && m.netSec === 0) return;
-      const md = m.netSec - m.sollSec;
-      monthRows += `<tr><td>${MONTH_NAMES[idx]}</td><td>${secToHMS(m.netSec)}</td><td>${secToHMS(m.sollSec)}</td><td class="${md>=0?'pos':'neg'}">${secToHMS(md,true)}</td></tr>`;
+      if(m.monSatSoll === 0 && m.monSatIst === 0 && m.sonntagIst === 0) return;
+      const md = m.monSatIst - m.monSatSoll;
+      monthRows += `<tr><td>${MONTH_NAMES[idx]}</td><td>${secToHMS(m.monSatIst)}</td><td>${secToHMS(m.monSatSoll)}</td><td class="${md>=0?'pos':'neg'}">${secToHMS(md,true)}</td></tr>`;
     });
 
     card.innerHTML = `
       <div class="year-head"><span class="year-title">${y}${y===currentYear?'<span class="year-tag">aktuell</span>':''}</span></div>
       <div class="summary">
-        <div class="box"><div class="label">Soll</div><div class="value">${secToHMS(s.sollSec)}</div></div>
-        <div class="box"><div class="label">Ist</div><div class="value">${secToHMS(s.netSec)}</div></div>
+        <div class="box"><div class="label">Soll (Mo–Sa)</div><div class="value">${secToHMS(s.monSatSoll)}</div></div>
+        <div class="box"><div class="label">Ist (Mo–Sa)</div><div class="value">${secToHMS(s.monSatIst)}</div></div>
         <div class="box ${diffSec>=0?'diff-pos':'diff-neg'}"><div class="label">Differenz</div><div class="value">${secToHMS(diffSec,true)}</div></div>
       </div>
+      ${s.sonntagIst>0 ? `<p class="empty-note" style="margin-top:10px;">+ ${secToHMS(s.sonntagIst)} Überstunden an Sonntagen (siehe Tab „Überstunden“)</p>` : ''}
       <details class="month-details">
         <summary>Monatsübersicht</summary>
         <table class="month-table">
@@ -682,14 +1085,19 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     const tab = btn.dataset.tab;
     document.getElementById('viewWeek').style.display = tab === 'week' ? '' : 'none';
+    document.getElementById('viewUeberstunden').style.display = tab === 'ueberstunden' ? '' : 'none';
+    document.getElementById('viewUrlaub').style.display = tab === 'urlaub' ? '' : 'none';
     document.getElementById('viewYear').style.display = tab === 'year' ? '' : 'none';
-    if(tab === 'year') renderYearView();
+    if(tab === 'week'){ render(); renderToday(); }
+    else if(tab === 'ueberstunden') renderUeberstundenView();
+    else if(tab === 'urlaub') renderUrlaubView();
+    else if(tab === 'year') renderYearView();
   });
 });
 
 // ---------- backup (export / import) ----------
 document.getElementById('exportBtn').addEventListener('click', () => {
-  const backup = {version:1, exportedAt: new Date().toISOString(), settings, weeks:{}};
+  const backup = {version:2, exportedAt: new Date().toISOString(), settings, absences, weeks:{}};
   for(let i=0;i<localStorage.length;i++){
     const key = localStorage.key(i);
     if(key && key.startsWith(WEEK_PREFIX)){
@@ -725,19 +1133,23 @@ importFileEl.addEventListener('change', (e) => {
     if(!confirm('Bestehende lokale Daten werden durch diese Sicherung ersetzt. Fortfahren?')) return;
 
     Object.keys(localStorage)
-      .filter(k => k.startsWith(WEEK_PREFIX) || k === SETTINGS_KEY)
+      .filter(k => k.startsWith(WEEK_PREFIX) || k === SETTINGS_KEY || k === ABSENCES_KEY)
       .forEach(k => localStorage.removeItem(k));
 
     if(backup.settings) saveSettings(backup.settings);
+    if(Array.isArray(backup.absences)) saveAbsences(backup.absences);
     Object.entries(backup.weeks).forEach(([key, value]) => {
       if(key.startsWith(WEEK_PREFIX)) localStorage.setItem(key, JSON.stringify(value));
     });
 
     settings = loadSettings();
+    absences = loadAbsences();
     weekData = loadWeek(currentMonday);
     render();
     renderToday();
     if(document.getElementById('viewYear').style.display !== 'none') renderYearView();
+    if(document.getElementById('viewUrlaub').style.display !== 'none') renderUrlaubView();
+    if(document.getElementById('viewUeberstunden').style.display !== 'none') renderUeberstundenView();
     alert('Sicherung erfolgreich importiert.');
   };
   reader.readAsText(file);
