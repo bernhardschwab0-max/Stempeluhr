@@ -157,6 +157,36 @@
   }
   .field input:focus, .field select:focus{outline:none;border-color:var(--accent);}
 
+  .time-display{
+    width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:8px 6px;font-size:.95rem;font-variant-numeric:tabular-nums;
+    text-align:left;cursor:pointer;font-family:inherit;
+  }
+  .time-display.placeholder{color:var(--muted);}
+  .time-display:hover{border-color:var(--accent);}
+
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,.6);
+    display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;
+  }
+  .time-modal{
+    background:var(--panel);border:1px solid var(--border);border-radius:16px;
+    padding:20px;width:100%;max-width:320px;
+  }
+  .time-modal h3{margin:0 0 16px;font-size:1rem;text-align:center;}
+  .time-modal .time-select-row{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:20px;}
+  .time-modal select{
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:10px 6px;font-size:1.3rem;font-variant-numeric:tabular-nums;text-align:center;
+  }
+  .time-modal .time-sep{font-size:1.3rem;font-weight:700;color:var(--muted);}
+  .time-modal .time-modal-actions{display:flex;gap:10px;}
+  .time-modal .time-modal-actions button{flex:1;padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:700;font-size:.95rem;}
+  .time-modal .btn-ok{background:var(--accent);color:#fff;}
+  .time-modal .btn-ok:hover{background:#3d7ae8;}
+  .time-modal .btn-cancel{background:var(--panel2);border:1px solid var(--border);color:var(--text);}
+  .time-modal .btn-cancel:hover{border-color:var(--red);color:var(--red);}
+
   .pause-row{
     display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.82rem;
   }
@@ -327,6 +357,53 @@ function secToHMS(totalSec, signed){
 function tage(n){ return `${n} Tag${n===1?'':'e'}`; }
 function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- eigenes Zeit-Auswahlfenster (schließt & speichert nur per OK, nie durch Fokusverlust) ----------
+function openTimePicker(title, currentValue, onConfirm){
+  const parts = (currentValue||'00:00:00').split(':').map(v => parseInt(v,10)||0);
+  const [ch, cm, cs] = [parts[0]||0, parts[1]||0, parts[2]||0];
+
+  const opts = (max) => Array.from({length:max}, (_,i) => String(i).padStart(2,'0'))
+    .map(v => `<option value="${v}">${v}</option>`).join('');
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'time-modal';
+  modal.innerHTML = `
+    <h3>${escapeHtml(title)}</h3>
+    <div class="time-select-row">
+      <select id="tpH">${opts(24)}</select>
+      <span class="time-sep">:</span>
+      <select id="tpM">${opts(60)}</select>
+      <span class="time-sep">:</span>
+      <select id="tpS">${opts(60)}</select>
+    </div>
+    <div class="time-modal-actions">
+      <button type="button" class="btn-cancel">Abbrechen</button>
+      <button type="button" class="btn-ok">OK</button>
+    </div>
+  `;
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+
+  const hSel = modal.querySelector('#tpH');
+  const mSel = modal.querySelector('#tpM');
+  const sSel = modal.querySelector('#tpS');
+  hSel.value = String(ch).padStart(2,'0');
+  mSel.value = String(cm).padStart(2,'0');
+  sSel.value = String(cs).padStart(2,'0');
+
+  // Bewusst kein Schließen per Backdrop-Klick oder Escape:
+  // das Fenster soll ausschließlich über OK/Abbrechen geschlossen werden.
+  function close(){ document.body.removeChild(backdrop); }
+  modal.querySelector('.btn-cancel').addEventListener('click', close);
+  modal.querySelector('.btn-ok').addEventListener('click', () => {
+    const val = `${hSel.value}:${mSel.value}:${sSel.value}`;
+    close();
+    onConfirm(val);
+  });
 }
 
 // ---------- time calculation (gross / break / net) ----------
@@ -587,11 +664,11 @@ function render(){
     timeRow.innerHTML = `
       <div class="field">
         <label>Start</label>
-        <input type="time" step="1" value="${entry.start||''}" data-idx="${i}" data-field="start">
+        <button type="button" class="time-display${entry.start?'':' placeholder'}" data-idx="${i}" data-field="start">${entry.start || '– –:– –:– –'}</button>
       </div>
       <div class="field">
         <label>Ende</label>
-        <input type="time" step="1" value="${entry.end||''}" data-idx="${i}" data-field="end">
+        <button type="button" class="time-display${entry.end?'':' placeholder'}" data-idx="${i}" data-field="end">${entry.end || '– –:– –:– –'}</button>
       </div>`;
     card.appendChild(timeRow);
 
@@ -624,10 +701,25 @@ function render(){
     daysEl.appendChild(card);
   });
 
-  // bind inputs (only commit on "change" - i.e. after confirming with OK/Enter/blur,
-  // not on every intermediate "input" event while still picking a time)
-  daysEl.querySelectorAll('input').forEach(inp => {
+  // Pause-Checkbox: normales Change-Event
+  daysEl.querySelectorAll('input[type=checkbox]').forEach(inp => {
     inp.addEventListener('change', onFieldChange);
+  });
+
+  // Zeit-Felder: eigenes Auswahlfenster, das nur per OK bestätigt & gespeichert wird
+  // (das native <input type="time"> schließt/verwirft sonst schon bei kurzem Fokusverlust)
+  daysEl.querySelectorAll('.time-display').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      const field = btn.dataset.field;
+      const label = (field === 'start' ? 'Start' : 'Ende') + ' – ' + WEEKDAY_NAMES[idx];
+      openTimePicker(label, weekData.days[idx][field], (newVal) => {
+        weekData.days[idx][field] = newVal;
+        saveWeek(currentMonday, weekData);
+        render();
+        renderToday();
+      });
+    });
   });
 
   // summary
