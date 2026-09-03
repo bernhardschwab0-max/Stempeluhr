@@ -260,12 +260,16 @@
         <div class="weeklabel" id="weekLabel"></div>
         <button id="nextWeek" title="Nächste Woche">&rarr;</button>
       </div>
-      <div class="weeknav" style="margin-bottom:0;">
+      <div class="weeknav" style="margin-bottom:12px;">
         <input type="date" id="weekPicker" style="flex:1;">
         <div class="soll-row" style="flex:none;">
           <label for="sollInput">Soll-Std./Woche</label>
           <input type="number" id="sollInput" min="0" step="0.5" value="40">
         </div>
+      </div>
+      <div class="soll-row" style="margin-bottom:0;">
+        <label for="bezahltePauseInput">Bezahlte Pause/Tag (Min)</label>
+        <input type="number" id="bezahltePauseInput" min="0" step="5" value="30">
       </div>
 
       <div class="summary grid2">
@@ -301,7 +305,7 @@ const DAY_SEC = 86400;
 const WEEK_PREFIX = 'stempeluhr_week_';
 const SETTINGS_KEY = 'stempeluhr_settings';
 const ABSENCES_KEY = 'stempeluhr_absences_v1';
-const DEFAULT_SETTINGS = {soll:40, pauschale:10, urlaubTage:30};
+const DEFAULT_SETTINGS = {soll:40, pauschale:10, urlaubTage:30, bezahltePause:30};
 
 // ---------- date helpers ----------
 function getMonday(d){
@@ -421,6 +425,13 @@ function calcDay(startStr, endStr, pauseTaken){
   const net = gross - brk;
 
   return {gross, brk, net, hasEntry:true, breakEligible};
+}
+
+// Bezahlte Pause ist Teil der Anwesenheit und zählt für Soll/Ist bereits voll mit
+// (siehe "net" oben) – diese Funktion liefert nur die Aufschlüsselung für die Anzeige.
+function paidBreakSplit(net){
+  const paidSec = Math.min(net, (settings.bezahltePause||0) * 60);
+  return { work: net - paidSec, paid: paidSec };
 }
 
 // ---------- state / storage ----------
@@ -611,6 +622,7 @@ const daysEl = document.getElementById('days');
 const weekLabelEl = document.getElementById('weekLabel');
 const weekPickerEl = document.getElementById('weekPicker');
 const sollInputEl = document.getElementById('sollInput');
+const bezahltePauseInputEl = document.getElementById('bezahltePauseInput');
 
 function render(){
   const sunday = addDays(currentMonday, 6);
@@ -618,6 +630,7 @@ function render(){
   weekPickerEl.value = isoDate(currentMonday);
   const soll = effectiveSoll(weekData);
   sollInputEl.value = soll;
+  bezahltePauseInputEl.value = settings.bezahltePause;
 
   const wb = computeWeekBalance(currentMonday, weekData);
 
@@ -691,6 +704,19 @@ function render(){
         <span><span class="k">Netto</span> <span class="v">${secToHMS(calc.net)}</span></span>
       `;
       card.appendChild(foot);
+
+      if(settings.bezahltePause > 0){
+        const split = paidBreakSplit(calc.net);
+        const foot2 = document.createElement('div');
+        foot2.className = 'day-foot';
+        foot2.style.borderTop = 'none';
+        foot2.style.paddingTop = '0';
+        foot2.innerHTML = `
+          <span><span class="k">davon Arbeitszeit</span> <span class="v">${secToHMS(split.work)}</span></span>
+          <span><span class="k">davon bez. Pause</span> <span class="v">${secToHMS(split.paid)}</span></span>
+        `;
+        card.appendChild(foot2);
+      }
     } else {
       const note = document.createElement('div');
       note.className = 'empty-note';
@@ -780,6 +806,12 @@ sollInputEl.addEventListener('input', () => {
   weekData.soll = val;
   settings.soll = val;
   saveWeek(currentMonday, weekData);
+  saveSettings(settings);
+  render();
+});
+bezahltePauseInputEl.addEventListener('input', () => {
+  const v = parseFloat(bezahltePauseInputEl.value);
+  settings.bezahltePause = isNaN(v) ? 0 : v;
   saveSettings(settings);
   render();
 });
