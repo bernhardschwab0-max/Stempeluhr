@@ -410,9 +410,11 @@ function openTimePicker(title, currentValue, onConfirm){
   });
 }
 
-// ---------- time calculation (gross / break / net) ----------
+// ---------- time calculation (gross / break / work / paid break / net) ----------
+// "net" (Ist) = tatsächlich gearbeitete Zeit + bezahlte Pause obendrauf (nicht davon abgezogen) –
+// die bezahlte Pause wird nicht real genommen, sondern zusätzlich zur geleisteten Zeit gutgeschrieben.
 function calcDay(startStr, endStr, pauseTaken){
-  const empty = {gross:0, brk:0, net:0, hasEntry:false, breakEligible:false};
+  const empty = {gross:0, brk:0, work:0, paidBreak:0, net:0, hasEntry:false, breakEligible:false};
   const startSec = timeToSec(startStr);
   let endSec = timeToSec(endStr);
   if(startSec === null || endSec === null) return empty;
@@ -422,16 +424,11 @@ function calcDay(startStr, endStr, pauseTaken){
 
   const breakEligible = gross > 6*3600;
   const brk = (breakEligible && pauseTaken) ? 1800 : 0;
-  const net = gross - brk;
+  const work = gross - brk;
+  const paidBreak = (settings.bezahltePause||0) * 60;
+  const net = work + paidBreak;
 
-  return {gross, brk, net, hasEntry:true, breakEligible};
-}
-
-// Bezahlte Pause ist Teil der Anwesenheit und zählt für Soll/Ist bereits voll mit
-// (siehe "net" oben) – diese Funktion liefert nur die Aufschlüsselung für die Anzeige.
-function paidBreakSplit(net){
-  const paidSec = Math.min(net, (settings.bezahltePause||0) * 60);
-  return { work: net - paidSec, paid: paidSec };
+  return {gross, brk, work, paidBreak, net, hasEntry:true, breakEligible};
 }
 
 // ---------- state / storage ----------
@@ -701,19 +698,18 @@ function render(){
       foot.innerHTML = `
         <span><span class="k">Brutto</span> <span class="v">${secToHMS(calc.gross)}</span></span>
         <span><span class="k">Pause</span> <span class="v">${secToHMS(calc.brk)}</span></span>
-        <span><span class="k">Netto</span> <span class="v">${secToHMS(calc.net)}</span></span>
+        <span><span class="k">Arbeitszeit</span> <span class="v">${secToHMS(calc.work)}</span></span>
       `;
       card.appendChild(foot);
 
       if(settings.bezahltePause > 0){
-        const split = paidBreakSplit(calc.net);
         const foot2 = document.createElement('div');
         foot2.className = 'day-foot';
         foot2.style.borderTop = 'none';
         foot2.style.paddingTop = '0';
         foot2.innerHTML = `
-          <span><span class="k">davon Arbeitszeit</span> <span class="v">${secToHMS(split.work)}</span></span>
-          <span><span class="k">davon bez. Pause</span> <span class="v">${secToHMS(split.paid)}</span></span>
+          <span><span class="k">+ bez. Pause</span> <span class="v">${secToHMS(calc.paidBreak)}</span></span>
+          <span><span class="k">Ist gesamt</span> <span class="v">${secToHMS(calc.net)}</span></span>
         `;
         card.appendChild(foot2);
       }
