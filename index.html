@@ -269,7 +269,7 @@
       </div>
       <div class="soll-row" style="margin-bottom:0;">
         <label for="bezahltePauseInput">Bezahlte Pause/Tag (Min)</label>
-        <input type="number" id="bezahltePauseInput" min="0" step="5" value="30">
+        <input type="number" id="bezahltePauseInput" min="0" step="5" value="15">
       </div>
 
       <div class="summary grid2">
@@ -305,7 +305,7 @@ const DAY_SEC = 86400;
 const WEEK_PREFIX = 'stempeluhr_week_';
 const SETTINGS_KEY = 'stempeluhr_settings';
 const ABSENCES_KEY = 'stempeluhr_absences_v1';
-const DEFAULT_SETTINGS = {soll:40, pauschale:10, urlaubTage:30, bezahltePause:30};
+const DEFAULT_SETTINGS = {soll:40, pauschale:10, urlaubTage:30, bezahltePause:15};
 
 // ---------- date helpers ----------
 function getMonday(d){
