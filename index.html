@@ -22,6 +22,7 @@
     --sonntag:#ffa94f;
     --vacation:#3ecf8e;
     --za:#8b7bf0;
+    --payout:#ff7eb6;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   *{box-sizing:border-box;}
@@ -134,6 +135,7 @@
   .day-card.absence{display:flex;align-items:center;justify-content:space-between;gap:12px;}
   .day-card.absence.urlaub{border-color:#1f4a3a;background:#122019;}
   .day-card.absence.za{border-color:#3a2f5c;background:#191527;}
+  .day-card.absence.payout{border-color:#4a2a3a;background:#1c1620;}
   .day-card .day-head{
     display:flex;justify-content:space-between;align-items:baseline;
     margin-bottom:10px;
@@ -146,6 +148,9 @@
   .badge.sonntag{background:rgba(255,169,79,.15);color:var(--sonntag);}
   .badge.urlaub{background:rgba(62,207,142,.15);color:var(--vacation);}
   .badge.za{background:rgba(139,123,240,.15);color:var(--za);}
+  .badge.payout{background:rgba(255,126,182,.15);color:var(--payout);}
+  .del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:4px;}
+  .del-btn:hover{color:var(--red);}
 
   .time-row{
     display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;
@@ -305,6 +310,7 @@ const DAY_SEC = 86400;
 const WEEK_PREFIX = 'stempeluhr_week_';
 const SETTINGS_KEY = 'stempeluhr_settings';
 const ABSENCES_KEY = 'stempeluhr_absences_v1';
+const PAYOUTS_KEY = 'stempeluhr_payouts_v1';
 const DEFAULT_SETTINGS = {soll:40, pauschale:10, urlaubTage:30, bezahltePause:15};
 
 // ---------- date helpers ----------
@@ -361,6 +367,19 @@ function secToHMS(totalSec, signed){
 function tage(n){ return `${n} Tag${n===1?'':'e'}`; }
 function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function newId(){
+  return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+}
+// "5,5" / "5.5" (Dezimalstunden) oder "5:30" (Std:Min) → Sekunden, null bei ungültiger Eingabe
+function parseHoursInput(str){
+  const s = String(str).trim();
+  let m = s.match(/^(\d+):([0-5]?\d)$/);
+  if(m) return (parseInt(m[1],10)*60 + parseInt(m[2],10)) * 60;
+  m = s.match(/^(\d+(?:[.,]\d+)?)$/);
+  if(m) return Math.round(parseFloat(m[1].replace(',','.')) * 3600);
+  return null;
 }
 
 // ---------- eigenes Zeit-Auswahlfenster (schließt & speichert nur per OK, nie durch Fokusverlust) ----------
@@ -468,8 +487,21 @@ function saveAbsences(list){
   localStorage.setItem(ABSENCES_KEY, JSON.stringify(list));
 }
 
+// Überstunden-Auszahlungen: {id, date:'YYYY-MM-DD', sec, note} – sec = ausgezahlte Zeit in Sekunden
+function loadPayouts(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(PAYOUTS_KEY));
+    if(Array.isArray(raw)) return raw.filter(p => p && typeof p.date === 'string' && Number.isFinite(p.sec) && p.sec > 0);
+  }catch(e){}
+  return [];
+}
+function savePayouts(list){
+  localStorage.setItem(PAYOUTS_KEY, JSON.stringify(list));
+}
+
 let settings = loadSettings();
 let absences = loadAbsences();
+let payouts = loadPayouts();
 let currentMonday = getMonday(new Date());
 let weekData = loadWeek(currentMonday);
 let urlaubYear = new Date().getFullYear();
@@ -578,11 +610,11 @@ function computeStats(years){
   return stats;
 }
 
-// ---------- ZA-Konto: kumulierte Überstunden über der Pauschale, minus genommener ZA-Tage ----------
+// ---------- ZA-Konto: kumulierte Überstunden über der Pauschale, minus genommener ZA-Tage und ausgezahlter Stunden ----------
 function computeZaKonto(){
   const weeks = getAllRelevantWeeks();
   const pauschaleSec = (settings.pauschale||0) * 3600;
-  let totalOverPauschale = 0;
+  let earnedSec = 0;
 
   if(weeks.length > 0){
     let minYear = Infinity, maxYear = -Infinity;
@@ -596,7 +628,7 @@ function computeZaKonto(){
     allYears.forEach(y => {
       stats[y].months.forEach(m => {
         const overtime = Math.max(0, m.monSatIst - m.monSatSoll) + m.sonntagIst;
-        totalOverPauschale += Math.max(0, overtime - pauschaleSec);
+        earnedSec += Math.max(0, overtime - pauschaleSec);
       });
     });
   }
@@ -611,7 +643,8 @@ function computeZaKonto(){
     });
   });
 
-  return totalOverPauschale - zaTakenSec;
+  const paidOutSec = payouts.reduce((sum, p) => sum + p.sec, 0);
+  return { earnedSec, zaTakenSec, paidOutSec, balanceSec: earnedSec - zaTakenSec - paidOutSec };
 }
 
 // ---------- week view render ----------
@@ -1001,7 +1034,7 @@ function renderUrlaubView(){
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="badge ${a.type}">${typeLabel}</span>
-          <button data-id="${a.id}" class="del-abs-btn" title="Löschen" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;">🗑</button>
+          <button data-id="${a.id}" class="del-btn del-abs-btn" title="Löschen">🗑</button>
         </div>
       `;
       listEl.appendChild(item);
@@ -1010,7 +1043,7 @@ function renderUrlaubView(){
 
   el.querySelector('#uPrevYear').addEventListener('click', () => { urlaubYear--; renderUrlaubView(); });
   el.querySelector('#uNextYear').addEventListener('click', () => { urlaubYear++; renderUrlaubView(); });
-  el.querySelector('#urlaubTageInput').addEventListener('input', (e) => {
+  el.querySelector('#urlaubTageInput').addEventListener('change', (e) => {
     const v = parseInt(e.target.value, 10);
     settings.urlaubTage = isNaN(v) ? 0 : v;
     saveSettings(settings);
@@ -1038,8 +1071,7 @@ function addAbsence(){
     alert('Für diesen Zeitraum existiert bereits ein Eintrag.');
     return;
   }
-  const id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2));
-  absences.push({ id, type, from, to, note });
+  absences.push({ id: newId(), type, from, to, note });
   saveAbsences(absences);
   renderUrlaubView();
 }
@@ -1047,7 +1079,8 @@ function addAbsence(){
 // ---------- Überstunden tab ----------
 function renderUeberstundenView(){
   const el = document.getElementById('viewUeberstunden');
-  const kontoSec = computeZaKonto();
+  const konto = computeZaKonto();
+  const kontoSec = konto.balanceSec;
   const dailyTargetSec = (settings.soll/6) * 3600;
   const approxDays = dailyTargetSec > 0 ? (kontoSec/dailyTargetSec) : 0;
 
@@ -1065,15 +1098,49 @@ function renderUeberstundenView(){
       <div class="today-label">Dein Zeitausgleich-Konto</div>
       <div class="today-sub" style="color:${kontoSec>=0?'var(--green)':'var(--red)'};">${secToHMS(kontoSec,true)}</div>
       <p class="empty-note">${hint}</p>
+      <p class="empty-note" style="margin:0;">Angesammelt +${secToHMS(konto.earnedSec)} · Zeitausgleich −${secToHMS(konto.zaTakenSec)} · Ausgezahlt −${secToHMS(konto.paidOutSec)}</p>
     </div>
     <div class="panel">
       <div class="soll-row">
         <label for="pauschaleInput">Überstundenpauschale (Std./Monat)</label>
         <input type="number" id="pauschaleInput" min="0" step="0.01" value="${settings.pauschale}">
       </div>
-      <p class="empty-note" style="margin-top:10px;">Überstunden bis zur Pauschale sind mit dem Gehalt bereits abgegolten. Nur was darüber hinausgeht, sammelt sich hier an und kann als Zeitausgleich genommen werden. Sonntagsstunden zählen dabei immer voll als Überstunden.</p>
+      <p class="empty-note" style="margin-top:10px;">Überstunden bis zur Pauschale sind mit dem Gehalt bereits abgegolten. Nur was darüber hinausgeht, sammelt sich hier an und kann als Zeitausgleich genommen oder ausgezahlt werden. Sonntagsstunden zählen dabei immer voll als Überstunden.</p>
     </div>
+    <div class="panel">
+      <div class="day-head" style="margin-bottom:6px;"><span class="day-name">Überstunden-Auszahlung</span></div>
+      <p class="empty-note" style="margin:0 0 10px;">Wurden Überstunden ausgezahlt, trage sie hier ein – sie werden vom Konto abgezogen.</p>
+      <div class="time-row">
+        <div class="field"><label>Datum</label><input type="date" id="payDate" value="${isoDate(new Date())}"></div>
+        <div class="field"><label>Stunden (z. B. 5,5 oder 5:30)</label><input type="text" id="payHours" inputmode="decimal" placeholder="5,5"></div>
+      </div>
+      <div class="field" style="margin-bottom:10px;"><label>Notiz (optional)</label><input type="text" id="payNote" placeholder="z. B. Lohn September"></div>
+      <button id="payAddBtn" class="today-btn start" style="width:100%;font-size:.95rem;padding:12px;">− Auszahlung abziehen</button>
+    </div>
+    <div id="payList"></div>
   `;
+
+  const payListEl = el.querySelector('#payList');
+  if(payouts.length === 0){
+    payListEl.innerHTML = '<p class="empty-note" style="text-align:center;margin-bottom:16px;">Noch keine Auszahlungen eingetragen.</p>';
+  } else {
+    // neueste zuerst (bei gleichem Datum zuletzt eingetragene oben: erst umdrehen, dann stabil nach Datum sortieren)
+    payouts.slice().reverse().sort((a,b) => b.date.localeCompare(a.date)).forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'day-card absence payout';
+      item.innerHTML = `
+        <div>
+          <div class="day-name">${deDate(new Date(p.date+'T00:00:00'))}</div>
+          <div class="day-date">${p.note ? escapeHtml(p.note) : 'Auszahlung'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="badge payout">−${secToHMS(p.sec)}</span>
+          <button data-id="${escapeHtml(p.id)}" class="del-btn del-pay-btn" title="Löschen">🗑</button>
+        </div>
+      `;
+      payListEl.appendChild(item);
+    });
+  }
 
   years.forEach(y => {
     const s = stats[y];
@@ -1109,12 +1176,36 @@ function renderUeberstundenView(){
     el.appendChild(card);
   });
 
-  el.querySelector('#pauschaleInput').addEventListener('input', (e) => {
+  // 'change' statt 'input': die Ansicht wird komplett neu aufgebaut, das Feld würde sonst nach jedem Zeichen den Fokus verlieren
+  el.querySelector('#pauschaleInput').addEventListener('change', (e) => {
     const v = parseFloat(e.target.value);
     settings.pauschale = isNaN(v) ? 0 : v;
     saveSettings(settings);
     renderUeberstundenView();
   });
+  el.querySelector('#payAddBtn').addEventListener('click', addPayout);
+  payListEl.querySelectorAll('.del-pay-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if(!confirm('Diese Auszahlung wirklich löschen? Die Stunden werden dem Konto wieder gutgeschrieben.')) return;
+      payouts = payouts.filter(p => p.id !== btn.dataset.id);
+      savePayouts(payouts);
+      renderUeberstundenView();
+    });
+  });
+}
+
+function addPayout(){
+  const date = document.getElementById('payDate').value;
+  const sec = parseHoursInput(document.getElementById('payHours').value);
+  const note = document.getElementById('payNote').value.trim();
+  if(!date){ alert('Bitte ein Datum angeben.'); return; }
+  if(sec === null || sec <= 0){ alert('Bitte die ausgezahlten Stunden angeben, z. B. 5,5 oder 5:30.'); return; }
+  const konto = computeZaKonto();
+  if(sec > Math.round(konto.balanceSec) &&
+     !confirm(`Die Auszahlung (${secToHMS(sec)}) ist höher als dein aktuelles Zeitausgleich-Konto (${secToHMS(konto.balanceSec, true)}). Trotzdem abziehen?`)) return;
+  payouts.push({ id: newId(), date, sec, note });
+  savePayouts(payouts);
+  renderUeberstundenView();
 }
 
 // ---------- Jahresrückblick ----------
@@ -1217,7 +1308,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ---------- backup (export / import) ----------
 document.getElementById('exportBtn').addEventListener('click', () => {
-  const backup = {version:2, exportedAt: new Date().toISOString(), settings, absences, weeks:{}};
+  const backup = {version:3, exportedAt: new Date().toISOString(), settings, absences, payouts, weeks:{}};
   for(let i=0;i<localStorage.length;i++){
     const key = localStorage.key(i);
     if(key && key.startsWith(WEEK_PREFIX)){
@@ -1253,17 +1344,19 @@ importFileEl.addEventListener('change', (e) => {
     if(!confirm('Bestehende lokale Daten werden durch diese Sicherung ersetzt. Fortfahren?')) return;
 
     Object.keys(localStorage)
-      .filter(k => k.startsWith(WEEK_PREFIX) || k === SETTINGS_KEY || k === ABSENCES_KEY)
+      .filter(k => k.startsWith(WEEK_PREFIX) || k === SETTINGS_KEY || k === ABSENCES_KEY || k === PAYOUTS_KEY)
       .forEach(k => localStorage.removeItem(k));
 
     if(backup.settings) saveSettings(backup.settings);
     if(Array.isArray(backup.absences)) saveAbsences(backup.absences);
+    if(Array.isArray(backup.payouts)) savePayouts(backup.payouts);
     Object.entries(backup.weeks).forEach(([key, value]) => {
       if(key.startsWith(WEEK_PREFIX)) localStorage.setItem(key, JSON.stringify(value));
     });
 
     settings = loadSettings();
     absences = loadAbsences();
+    payouts = loadPayouts();
     weekData = loadWeek(currentMonday);
     render();
     renderToday();
