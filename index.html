@@ -132,6 +132,7 @@
     margin-bottom:10px;
   }
   .day-card.sonntag{border-color:#4a3a2a;background:#211a12;}
+  .day-card.za-day{border-color:#3a2f5c;background:#191527;}
   .day-card.absence{display:flex;align-items:center;justify-content:space-between;gap:12px;}
   .day-card.absence.urlaub{border-color:#1f4a3a;background:#122019;}
   .day-card.absence.za{border-color:#3a2f5c;background:#191527;}
@@ -269,13 +270,14 @@
         <input type="date" id="weekPicker" style="flex:1;">
         <div class="soll-row" style="flex:none;">
           <label for="sollInput">Soll-Std./Woche</label>
-          <input type="number" id="sollInput" min="0" step="0.01" value="40">
+          <input type="number" id="sollInput" min="0" step="0.01" value="38.5">
         </div>
       </div>
       <div class="soll-row" style="margin-bottom:0;">
         <label for="bezahltePauseInput">Bezahlte Pause/Tag (Min)</label>
-        <input type="number" id="bezahltePauseInput" min="0" step="5" value="15">
+        <input type="number" id="bezahltePauseInput" min="0" step="5" value="0">
       </div>
+      <div class="empty-note" style="margin-top:6px;">Wird zusätzlich zur Arbeitszeit gutgeschrieben. Ist die Pause im Soll schon eingerechnet, auf 0 lassen.</div>
 
       <div class="summary grid2">
         <div class="box">
@@ -311,7 +313,8 @@ const WEEK_PREFIX = 'stempeluhr_week_';
 const SETTINGS_KEY = 'stempeluhr_settings';
 const ABSENCES_KEY = 'stempeluhr_absences_v1';
 const PAYOUTS_KEY = 'stempeluhr_payouts_v1';
-const DEFAULT_SETTINGS = {soll:40, pauschale:10, urlaubTage:30, bezahltePause:15};
+// soll = wöchentliche Arbeitszeit (tatsächlich gearbeitet, die bezahlte Pause ist darin schon enthalten)
+const DEFAULT_SETTINGS = {soll:38.5, pauschale:10, urlaubTage:30, bezahltePause:0, settingsVersion:2};
 
 // ---------- date helpers ----------
 function getMonday(d){
@@ -454,10 +457,27 @@ function calcDay(startStr, endStr, pauseTaken){
 function weekKey(monday){ return WEEK_PREFIX + isoDate(monday); }
 
 function loadSettings(){
-  try{
-    const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY));
-    return {...DEFAULT_SETTINGS, ...(stored||{})};
-  }catch(e){ return {...DEFAULT_SETTINGS}; }
+  let stored = null;
+  try{ stored = JSON.parse(localStorage.getItem(SETTINGS_KEY)); }catch(e){}
+  const s = {...DEFAULT_SETTINGS, ...(stored||{})};
+
+  // Einmalige Umstellung auf Version 2: Die wöchentliche Zeit ist jetzt die tatsächliche Arbeitszeit (38,5 Std.),
+  // die bezahlte Pause steckt in den bezahlten 40 Std. und wird nicht mehr zusätzlich gutgeschrieben.
+  // Von Hand gespeicherte Wochen-Soll-Werte (auch falsche, die durch das frühere Tipp-Problem im Soll-Feld entstanden
+  // sein können, z. B. 0) werden entfernt, damit in allen Wochen der Standard gilt.
+  if(stored && !(stored.settingsVersion >= 2)){
+    s.soll = DEFAULT_SETTINGS.soll;
+    s.bezahltePause = DEFAULT_SETTINGS.bezahltePause;
+    s.settingsVersion = 2;
+    try{ saveSettings(s); }catch(e){}
+    Object.keys(localStorage).filter(k => k.startsWith(WEEK_PREFIX)).forEach(k => {
+      try{
+        const w = JSON.parse(localStorage.getItem(k));
+        if(w && w.soll !== undefined){ delete w.soll; localStorage.setItem(k, JSON.stringify(w)); }
+      }catch(e){}
+    });
+  }
+  return s;
 }
 function saveSettings(s){
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
@@ -537,36 +557,60 @@ function absenceDaysUsedInYear(year, type){
   return total;
 }
 
+// Zeitausgleich-Sekunden pro Tag eines ZA-Eintrags: selbst eingetragene Stunden (hoursSec),
+// bei älteren Einträgen ohne Stunden ein ganzer Tag (dailyTargetSec)
+function zaSecForEntry(a, dailyTargetSec){
+  return Number.isFinite(a.hoursSec) ? a.hoursSec : dailyTargetSec;
+}
+// Zeitausgleich-Sekunden, die ein ZA-Eintrag an einem Datum abzieht (Sonntag: keine)
+function zaSecOnDate(a, d){
+  if(weekdayIndex(d) === 6) return 0;
+  return zaSecForEntry(a, effectiveSoll(loadWeek(getMonday(d))) / 6 * 3600);
+}
+function zaSecondsInYear(year){
+  let total = 0;
+  const yStart = `${year}-01-01`, yEnd = `${year}-12-31`;
+  absences.forEach(a => {
+    if(a.type !== 'za') return;
+    const from = a.from < yStart ? yStart : a.from;
+    const to = a.to > yEnd ? yEnd : a.to;
+    rangeDates(from, to).forEach(d => { total += zaSecOnDate(a, d); });
+  });
+  return total;
+}
+
 // ---------- weekly balance (Mo–Sa gegen Soll, Sonntag immer Überstunden) ----------
 function computeWeekBalance(monday, data){
   const rawSoll = effectiveSoll(data);
   const dailyTarget = rawSoll / 6;
   let monSatNet = 0, sonntagNet = 0;
-  let vacDays = 0, zaDays = 0;
+  let vacDays = 0, zaSec = 0;
 
   for(let i=0;i<7;i++){
     const d = addDays(monday, i);
     const dateIso = isoDate(d);
     const abs = getAbsenceForDate(dateIso);
 
-    if(i === 6){ // Sonntag
-      if(!abs){
+    if(i === 6){ // Sonntag: nur Urlaub blendet aus, an Sonntagen gibt es kein Soll und damit keinen Zeitausgleich
+      if(!abs || abs.type === 'za'){
         const calc = calcDay(data.days[i].start, data.days[i].end, data.days[i].pause);
         sonntagNet += calc.net;
       }
       continue;
     }
-    if(abs){
-      if(abs.type === 'urlaub') vacDays++; else zaDays++;
-      continue; // Urlaub/ZA-Tag: neutral, kein Ist, kein Soll
+    if(abs && abs.type === 'urlaub'){
+      vacDays++;
+      continue; // Urlaubstag: neutral, kein Ist, kein Soll
     }
+    // Zeitausgleich: die eingetragenen ZA-Stunden mindern das Soll, an dem Tag gearbeitete Zeit zählt trotzdem
+    if(abs && abs.type === 'za') zaSec += zaSecForEntry(abs, dailyTarget*3600);
     const calc = calcDay(data.days[i].start, data.days[i].end, data.days[i].pause);
     monSatNet += calc.net;
   }
 
-  const adjustedSollSec = Math.max(0, rawSoll - (vacDays+zaDays)*dailyTarget) * 3600;
+  const adjustedSollSec = Math.max(0, rawSoll*3600 - vacDays*dailyTarget*3600 - zaSec);
   const diffSec = monSatNet - adjustedSollSec;
-  return { rawSoll, dailyTarget, monSatNet, sonntagNet, vacDays, zaDays, adjustedSollSec, diffSec };
+  return { rawSoll, dailyTarget, monSatNet, sonntagNet, vacDays, zaSec, adjustedSollSec, diffSec };
 }
 
 // ---------- Jahres-/Monatsstatistik (für Jahresrückblick & Überstunden) ----------
@@ -593,15 +637,17 @@ function computeStats(years){
       const abs = getAbsenceForDate(dateIso);
 
       if(i === 6){
-        if(!abs){
+        if(!abs || abs.type === 'za'){
           const calc = calcDay(data.days[i].start, data.days[i].end, data.days[i].pause);
           if(calc.hasEntry){ s.sonntagIst += calc.net; m.sonntagIst += calc.net; }
         }
         continue;
       }
-      if(abs) continue;
+      if(abs && abs.type === 'urlaub') continue;
 
-      s.monSatSoll += dailyTarget*3600; m.monSatSoll += dailyTarget*3600;
+      // Zeitausgleich-Stunden mindern das Soll dieses Tages; gearbeitete Zeit zählt trotzdem als Ist
+      const sollSec = dailyTarget*3600 - (abs ? zaSecForEntry(abs, dailyTarget*3600) : 0);
+      s.monSatSoll += sollSec; m.monSatSoll += sollSec;
       const calc = calcDay(data.days[i].start, data.days[i].end, data.days[i].pause);
       if(calc.hasEntry){ s.monSatIst += calc.net; m.monSatIst += calc.net; }
     }
@@ -635,12 +681,7 @@ function computeZaKonto(){
 
   let zaTakenSec = 0;
   absences.filter(a => a.type === 'za').forEach(a => {
-    rangeDates(a.from, a.to).forEach(d => {
-      if(weekdayIndex(d) === 6) return;
-      const monday = getMonday(d);
-      const data = loadWeek(monday);
-      zaTakenSec += (effectiveSoll(data)/6) * 3600;
-    });
+    rangeDates(a.from, a.to).forEach(d => { zaTakenSec += zaSecOnDate(a, d); });
   });
 
   const paidOutSec = payouts.reduce((sum, p) => sum + p.sec, 0);
@@ -675,27 +716,30 @@ function render(){
 
     const card = document.createElement('div');
 
-    if(abs){
-      card.className = 'day-card absence ' + abs.type;
-      const typeLabel = abs.type === 'urlaub' ? '🌴 Urlaub' : '🔁 Zeitausgleich';
+    if(abs && abs.type === 'urlaub'){
+      card.className = 'day-card absence urlaub';
       card.innerHTML = `
         <div>
           <div class="day-name">${WEEKDAY_NAMES[i]}</div>
           <div class="day-date">${deDate(date)}</div>
         </div>
-        <span class="badge ${abs.type}">${typeLabel}</span>
+        <span class="badge urlaub">🌴 Urlaub</span>
       `;
       daysEl.appendChild(card);
       return;
     }
 
-    card.className = 'day-card' + (isSonntag ? ' sonntag' : '');
+    // Zeitausgleich-Tag (Mo–Sa): normale Karte, damit trotzdem gearbeitete Zeit eingetragen werden kann
+    const zaSec = (abs && !isSonntag) ? zaSecForEntry(abs, wb.dailyTarget*3600) : 0;
+
+    card.className = 'day-card' + (isSonntag ? ' sonntag' : '') + (zaSec > 0 ? ' za-day' : '');
 
     const head = document.createElement('div');
     head.className = 'day-head';
     head.innerHTML = `
       <span class="day-name${isSonntag?' so':''}">${WEEKDAY_NAMES[i]}</span>
       <span style="display:flex;align-items:center;gap:8px;">
+        ${zaSec > 0 ? `<span class="badge za">🔁 ZA ${secToHMS(zaSec)}</span>` : ''}
         ${isSonntag && calc.hasEntry ? '<span class="badge sonntag">Überstunden</span>' : ''}
         <span class="day-date">${deDate(date)}</span>
       </span>
@@ -788,10 +832,10 @@ function render(){
   document.getElementById('sumSonntag').textContent = secToHMS(wb.sonntagNet);
 
   const sollHint = document.getElementById('sollHint');
-  if(wb.vacDays + wb.zaDays > 0){
+  if(wb.vacDays > 0 || wb.zaSec > 0){
     const parts = [];
     if(wb.vacDays) parts.push(`${wb.vacDays} Urlaub`);
-    if(wb.zaDays) parts.push(`${wb.zaDays} ZA`);
+    if(wb.zaSec) parts.push(`${secToHMS(wb.zaSec)} ZA`);
     sollHint.textContent = `(− ${parts.join(', ')})`;
   } else {
     sollHint.textContent = '';
@@ -829,18 +873,21 @@ weekPickerEl.addEventListener('change', () => {
   weekData = loadWeek(currentMonday);
   render();
 });
-sollInputEl.addEventListener('input', () => {
+// 'change' statt 'input': render() schreibt den Feldwert zurück. Beim Tippen (z. B. "37." oder leeres Feld)
+// wurde die Eingabe sonst sofort als 0 gespeichert und überschrieben. Ungültig → alter Wert bleibt.
+sollInputEl.addEventListener('change', () => {
   const v = parseFloat(sollInputEl.value);
-  const val = isNaN(v) ? 0 : v;
-  weekData.soll = val;
-  settings.soll = val;
+  if(isNaN(v) || v < 0){ render(); return; }
+  weekData.soll = v;
+  settings.soll = v;
   saveWeek(currentMonday, weekData);
   saveSettings(settings);
   render();
 });
-bezahltePauseInputEl.addEventListener('input', () => {
+bezahltePauseInputEl.addEventListener('change', () => {
   const v = parseFloat(bezahltePauseInputEl.value);
-  settings.bezahltePause = isNaN(v) ? 0 : v;
+  if(isNaN(v) || v < 0){ render(); return; }
+  settings.bezahltePause = v;
   saveSettings(settings);
   render();
 });
@@ -905,9 +952,9 @@ function renderToday(){
   const todayAbs = getAbsenceForDate(todayIso);
   const open = getOpenEntry();
 
-  if(!open && todayAbs){
-    const typeLabel = todayAbs.type === 'urlaub' ? '🌴 Urlaub' : '🔁 Zeitausgleich';
-    todayLabelEl.textContent = `Heute: ${typeLabel} eingetragen`;
+  // Nur Urlaub sperrt den Start-Knopf; an Zeitausgleich-Tagen kann trotzdem gearbeitet werden
+  if(!open && todayAbs && todayAbs.type === 'urlaub'){
+    todayLabelEl.textContent = 'Heute: 🌴 Urlaub eingetragen';
     todaySubEl.textContent = '';
     todayBtnEl.textContent = 'Kein Arbeitstag';
     todayBtnEl.className = 'today-btn secondary';
@@ -966,7 +1013,8 @@ function renderUrlaubView(){
   const total = settings.urlaubTage || 0;
   const used = absenceDaysUsedInYear(urlaubYear, 'urlaub');
   const rest = total - used;
-  const zaUsed = absenceDaysUsedInYear(urlaubYear, 'za');
+  const zaSecUsed = zaSecondsInYear(urlaubYear);
+  const dailyHM = secToHMS(settings.soll/6*3600).slice(0, -3); // ganzer Tag, z. B. 6:25
 
   el.innerHTML = `
     <div class="panel">
@@ -983,7 +1031,7 @@ function renderUrlaubView(){
         <div class="box"><div class="label">Gesamt</div><div class="value">${tage(total)}</div></div>
         <div class="box"><div class="label">Genommen</div><div class="value">${tage(used)}</div></div>
         <div class="box ${rest>=0?'diff-pos':'diff-neg'}"><div class="label">Rest</div><div class="value">${tage(rest)}</div></div>
-        <div class="box"><div class="label">Zeitausgleich genommen</div><div class="value">${tage(zaUsed)}</div></div>
+        <div class="box"><div class="label">Zeitausgleich genommen</div><div class="value">${secToHMS(zaSecUsed)}</div></div>
       </div>
     </div>
 
@@ -1003,6 +1051,10 @@ function renderUrlaubView(){
         </div>
         <div class="field"><label>Notiz (optional)</label><input type="text" id="absNote" placeholder="z. B. Kurzurlaub"></div>
       </div>
+      <div class="field" id="absHoursField" style="display:none;margin-bottom:10px;">
+        <label>Zeitausgleich-Stunden pro Tag (z. B. 3,5 oder 3:30)</label>
+        <input type="text" id="absHours" inputmode="decimal" placeholder="${dailyHM} = ganzer Tag">
+      </div>
       <button id="absAddBtn" class="today-btn start" style="width:100%;font-size:.95rem;padding:12px;">+ Eintragen</button>
     </div>
 
@@ -1021,6 +1073,12 @@ function renderUrlaubView(){
       const clipFrom = a.from < `${urlaubYear}-01-01` ? `${urlaubYear}-01-01` : a.from;
       const clipTo = a.to > `${urlaubYear}-12-31` ? `${urlaubYear}-12-31` : a.to;
       const days = countWorkDaysInRange(clipFrom, clipTo);
+      let detail = tage(days);
+      if(a.type === 'za'){
+        detail = Number.isFinite(a.hoursSec)
+          ? (days === 1 ? secToHMS(a.hoursSec) : `${tage(days)} × ${secToHMS(a.hoursSec)}`)
+          : `${tage(days)} (ganzer Tag)`;
+      }
       const item = document.createElement('div');
       item.className = 'day-card absence ' + a.type;
       const typeLabel = a.type === 'urlaub' ? '🌴 Urlaub' : '🔁 Zeitausgleich';
@@ -1030,7 +1088,7 @@ function renderUrlaubView(){
       item.innerHTML = `
         <div>
           <div class="day-name">${rangeLabel}</div>
-          <div class="day-date">${days} Tag${days===1?'':'e'}${a.note?' · '+escapeHtml(a.note):''}</div>
+          <div class="day-date">${detail}${a.note?' · '+escapeHtml(a.note):''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="badge ${a.type}">${typeLabel}</span>
@@ -1050,6 +1108,10 @@ function renderUrlaubView(){
     renderUrlaubView();
   });
   el.querySelector('#absAddBtn').addEventListener('click', addAbsence);
+  const absTypeEl = el.querySelector('#absType');
+  absTypeEl.addEventListener('change', () => {
+    el.querySelector('#absHoursField').style.display = absTypeEl.value === 'za' ? '' : 'none';
+  });
   listEl.querySelectorAll('.del-abs-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       if(!confirm('Diesen Eintrag wirklich löschen?')) return;
@@ -1067,11 +1129,18 @@ function addAbsence(){
   const note = document.getElementById('absNote').value.trim();
   if(!from || !to){ alert('Bitte Von- und Bis-Datum angeben.'); return; }
   if(from > to){ alert('Das Bis-Datum muss nach dem Von-Datum liegen.'); return; }
+  if(countWorkDaysInRange(from, to) === 0){ alert('Im gewählten Zeitraum liegt kein Arbeitstag (Mo–Sa).'); return; }
+  // Zeitausgleich: die Stunden pro Tag trägst du selbst ein (kein automatischer ganzer Tag)
+  let hoursSec;
+  if(type === 'za'){
+    hoursSec = parseHoursInput(document.getElementById('absHours').value);
+    if(hoursSec === null || hoursSec <= 0){ alert('Bitte die Zeitausgleich-Stunden pro Tag angeben, z. B. 3,5 oder 3:30.'); return; }
+  }
   if(absences.some(a => a.from <= to && from <= a.to)){
     alert('Für diesen Zeitraum existiert bereits ein Eintrag.');
     return;
   }
-  absences.push({ id: newId(), type, from, to, note });
+  absences.push({ id: newId(), type, from, to, note, ...(type === 'za' ? { hoursSec } : {}) });
   saveAbsences(absences);
   renderUrlaubView();
 }

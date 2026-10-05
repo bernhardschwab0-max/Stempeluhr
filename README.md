@@ -11,9 +11,9 @@ Alle Daten werden lokal im `localStorage` des Browsers gespeichert.
 - **Tag starten / Tag beenden**: ein Klick beim Arbeitsbeginn übernimmt die aktuelle Uhrzeit auf die Sekunde genau als Start, ein Klick beim Feierabend als Ende – inklusive Live-Laufzeitanzeige während der Schicht
 - **Wochenansicht** (Mo–So) mit Start-/Endzeit, auch manuell editierbar
 - **Pausenregelung**: Ab 6 Stunden Bruttoarbeitszeit wählbar, ob 30 Minuten Pause gemacht wurden
-- **Sechstagewoche mit Sonntagsregel**: Soll-/Ist-Vergleich läuft über Mo–Sa gegen die frei einstellbaren wöchentlichen Sollstunden; Sonntagsarbeit zählt automatisch immer als Überstunden, unabhängig vom Wochensaldo
+- **Sechstagewoche mit Sonntagsregel**: Soll-/Ist-Vergleich läuft über Mo–Sa gegen die frei einstellbaren wöchentlichen Sollstunden (Standard 38,5 = tatsächliche Arbeitszeit; eine bezahlte Pause pro Tag lässt sich optional zusätzlich gutschreiben, Standard 0); Sonntagsarbeit zählt automatisch immer als Überstunden, unabhängig vom Wochensaldo
 - **Urlaubsverwaltung**: Urlaubstage/Jahr frei einstellbar (Standard 30), Eintrag per Von-/Bis-Datum, Restanzeige pro Jahr
-- **Überstunden & Zeitausgleich**: monatliche Überstundenpauschale (Std., Standard 10) frei einstellbar; Überstunden darüber hinaus sammeln sich in einem kumulierten Zeitausgleich-Konto, das per Zeitausgleich-Eintrag oder per eingetragener Überstunden-Auszahlung (Stunden werden vom Konto abgezogen) wieder abgebaut werden kann
+- **Überstunden & Zeitausgleich**: monatliche Überstundenpauschale (Std., Standard 10) frei einstellbar; Überstunden darüber hinaus sammeln sich in einem kumulierten Zeitausgleich-Konto, das per Zeitausgleich-Eintrag (Stunden pro Tag selbst eingetragen; an ZA-Tagen gearbeitete Zeit zählt trotzdem) oder per eingetragener Überstunden-Auszahlung (Stunden werden vom Konto abgezogen) wieder abgebaut werden kann
 - **Jahresrückblick**: aggregierte Soll-/Ist-Übersicht (Mo–Sa) für das aktuelle Jahr und die zwei Vorjahre, inkl. Monatsaufschlüsselung
 - **Sicherung (Backup)**: alle Daten (Zeiten, Einstellungen, Urlaub/Zeitausgleich, Auszahlungen) lassen sich als JSON-Datei exportieren und auf einem anderen Gerät/Browser wieder importieren
 
