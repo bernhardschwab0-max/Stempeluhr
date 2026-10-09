@@ -524,7 +524,19 @@ let absences = loadAbsences();
 let payouts = loadPayouts();
 let currentMonday = getMonday(new Date());
 let weekData = loadWeek(currentMonday);
-let urlaubYear = new Date().getFullYear();
+// Urlaubsjahr läuft nicht kalendarisch, sondern vom Stichtag 20. Juli bis 19. Juli des Folgejahres.
+// "urlaubYear" ist das Jahr, in dem das Urlaubsjahr beginnt (2026 = 20.07.2026 – 19.07.2027).
+const URLAUB_STICHTAG_MONTH = 7, URLAUB_STICHTAG_DAY = 20;
+function urlaubYearOf(date){
+  const stichtag = new Date(date.getFullYear(), URLAUB_STICHTAG_MONTH - 1, URLAUB_STICHTAG_DAY);
+  return date >= stichtag ? date.getFullYear() : date.getFullYear() - 1;
+}
+function urlaubYearRange(startYear){
+  const from = new Date(startYear, URLAUB_STICHTAG_MONTH - 1, URLAUB_STICHTAG_DAY);
+  const to = addDays(new Date(startYear + 1, URLAUB_STICHTAG_MONTH - 1, URLAUB_STICHTAG_DAY), -1);
+  return { from: isoDate(from), to: isoDate(to) };
+}
+let urlaubYear = urlaubYearOf(new Date());
 
 // ---------- absence helpers (Urlaub / Zeitausgleich) ----------
 function rangeDates(fromIso, toIso){
@@ -546,7 +558,7 @@ function getAbsenceForDate(dateIso){
 }
 function absenceDaysUsedInYear(year, type){
   let total = 0;
-  const yStart = `${year}-01-01`, yEnd = `${year}-12-31`;
+  const { from: yStart, to: yEnd } = urlaubYearRange(year);
   absences.forEach(a => {
     if(a.type !== type) return;
     const from = a.from < yStart ? yStart : a.from;
@@ -569,7 +581,7 @@ function zaSecOnDate(a, d){
 }
 function zaSecondsInYear(year){
   let total = 0;
-  const yStart = `${year}-01-01`, yEnd = `${year}-12-31`;
+  const { from: yStart, to: yEnd } = urlaubYearRange(year);
   absences.forEach(a => {
     if(a.type !== 'za') return;
     const from = a.from < yStart ? yStart : a.from;
@@ -1015,12 +1027,14 @@ function renderUrlaubView(){
   const rest = total - used;
   const zaSecUsed = zaSecondsInYear(urlaubYear);
   const dailyHM = secToHMS(settings.soll/6*3600).slice(0, -3); // ganzer Tag, z. B. 6:25
+  const yr = urlaubYearRange(urlaubYear);
+  const urlaubLabel = `${deDate(new Date(yr.from+'T00:00:00'))} – ${deDate(new Date(yr.to+'T00:00:00'))}`;
 
   el.innerHTML = `
     <div class="panel">
       <div class="weeknav">
         <button id="uPrevYear">&larr;</button>
-        <div class="weeklabel">${urlaubYear}</div>
+        <div class="weeklabel">${urlaubLabel}</div>
         <button id="uNextYear">&rarr;</button>
       </div>
       <div class="soll-row" style="margin-bottom:12px;">
@@ -1063,15 +1077,15 @@ function renderUrlaubView(){
 
   const listEl = el.querySelector('#absList');
   const relevant = absences
-    .filter(a => parseInt(a.from.slice(0,4),10) <= urlaubYear && parseInt(a.to.slice(0,4),10) >= urlaubYear)
+    .filter(a => a.from <= yr.to && a.to >= yr.from)
     .sort((a,b) => b.from.localeCompare(a.from));
 
   if(relevant.length === 0){
     listEl.innerHTML = '<p class="empty-note" style="text-align:center;">Keine Einträge für dieses Jahr.</p>';
   } else {
     relevant.forEach(a => {
-      const clipFrom = a.from < `${urlaubYear}-01-01` ? `${urlaubYear}-01-01` : a.from;
-      const clipTo = a.to > `${urlaubYear}-12-31` ? `${urlaubYear}-12-31` : a.to;
+      const clipFrom = a.from < yr.from ? yr.from : a.from;
+      const clipTo = a.to > yr.to ? yr.to : a.to;
       const days = countWorkDaysInRange(clipFrom, clipTo);
       let detail = tage(days);
       if(a.type === 'za'){
